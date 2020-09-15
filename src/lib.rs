@@ -2,7 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
 use near_sdk::json_types::{U128};
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, Promise, StorageUsage,
+    env, near_bindgen, AccountId, Balance, Promise, StorageUsage, EpochHeight
 };
 use uint::construct_uint;
 
@@ -15,8 +15,10 @@ mod validator;
 #[global_allocator]
 static ALLOC: near_sdk::wee_alloc::WeeAlloc<'_> = near_sdk::wee_alloc::WeeAlloc::INIT;
 
+const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
+
 /// Price per 1 byte of storage from mainnet genesis config.
-const STORAGE_PRICE_PER_BYTE: Balance = 100000000000000000000;
+const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
 pub type NumStakeShares = Balance;
 
@@ -67,11 +69,24 @@ impl TokenAccount {
     }
 }
 
+pub struct WithdrawAccount {
+    // Claim 한 시점에서 토큰이 소각되고, 해당 balance만큼 기록됨
+    pub claim_balance: Balance,
+
+    // Near withdraw 가능한 시간 기록
+    pub unstaked_available_epoch_height: EpochHeight,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct BondToken {
+    /// for Token
     /// sha256(AccountId) -> Account Detail
     pub accounts: LookupMap<Vec<u8>, TokenAccount>,
+
+    /// for withdraws
+    /// sha256(AccountId) -> Withdrawer Detail
+    pub withdraws: LookupMap<Vec<u8>, WithdrawAccount>,
 
     /// 토큰이 제공하는 소수점자리
     /// 기본 18u8
@@ -82,6 +97,9 @@ pub struct BondToken {
 
     /// total token balance
     pub total_supply: Balance,
+
+    /// total staked balance
+    pub total_stake: Balance,
 
     /// 토큰 수량을 계산하는 scale factor
     pub scale_factor: Balance,
@@ -98,19 +116,18 @@ impl Default for BondToken {
 impl BondToken {
     
     #[init]
-    pub fn new(owner_id: AccountId, total_supply: U128) -> Self {
+    pub fn new() -> Self {
         // state가 있는지 확인.
         assert!(!env::state_exists(), "Already initialized");
-        let total_supply = total_supply.into();
         let mut bt = Self {
             accounts: LookupMap::new(b"a".to_vec()),
+            withdraws: LookupMap::new(b"a".to_vec()),
             decimals: 18u8,
             owner: env::predecessor_account_id(),
-            total_supply,
-            scale_factor: 1u128 };
-        let mut account = bt.get_account(&owner_id);
-        account.balance = total_supply;
-        bt.set_account(&owner_id, &account);
+            total_supply: 0u128,
+            total_stake: 0u128,
+            scale_factor: 1u128
+        };
         bt
     }
 
@@ -191,11 +208,30 @@ impl BondToken {
     #[payable]
     pub fn mint(&mut self, amount: U128) {
         let initial_storage = env::storage_usage();
+        // owner 확인
         assert_eq!(env::predecessor_account_id(), self.owner, "Not Owner");
         let owner_id = env::predecessor_account_id();
         let amount: Balance = amount.into();
         let mut account = self.get_account(&self.owner);
         account.balance += amount;
+        self.set_account(&owner_id, &account);
+        self.refund_storage(initial_storage);
+    }
+
+    #[payable]
+    pub fn deposit(&mut self) {
+        let initial_storage = env::storage_usage();
+
+        let owner_id = env::predecessor_account_id();
+        let amount = env::attached_deposit();
+
+        validator::ext_validator::deposit_and_stake(&self.owner, amount, DEPOSIT_AND_STAKING_GAS);
+
+        let mut account = self.get_account(&self.owner);
+        account.balance += amount;
+
+        self.total_supply += amount;
+
         self.set_account(&owner_id, &account);
         self.refund_storage(initial_storage);
     }
