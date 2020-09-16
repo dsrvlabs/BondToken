@@ -128,14 +128,14 @@ impl Default for BondToken {
 impl BondToken {
     
     #[init]
-    pub fn new() -> Self {
+    pub fn new(validator: AccountId) -> Self {
         // state가 있는지 확인.
         assert!(!env::state_exists(), "Already initialized");
         Self {
             accounts: LookupMap::new(b"a".to_vec()),
             withdraws: LookupMap::new(b"a".to_vec()),
             decimals: 18u8,
-            owner: env::predecessor_account_id(),
+            owner: validator,
             total_supply: 0u128,
             total_stake: 0u128,
             scale_factor: 1u128
