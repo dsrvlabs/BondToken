@@ -3,12 +3,6 @@ use near_sdk::json_types::U128;
 
 #[ext_contract(ext_validator)]
 pub trait validator {
-    // #[payable]
-    fn transfer(&mut self, dest: AccountId, amount: U128);
-
-    // #[payable]
-    fn transfer_from(&mut self, from: AccountId, dest: AccountId, amount: U128);
-
     /// Deposits the attached amount into the inner account of the predecessor.
     // #[payable]
     fn deposit(&mut self);
@@ -34,10 +28,10 @@ pub trait validator {
 
     /// Unstakes all staked balance from the inner account of the predecessor.
     /// The new total unstaked balance will be available for withdrawal in four epochs.
-    pub fn unstake_all(&mut self);
+    fn unstake_all(&mut self);
 
     /// Unstakes the given amount from the inner account of the predecessor.
     /// The inner account should have enough staked balance.
     /// The new total unstaked balance will be available for withdrawal in four epochs.
-    pub fn unstake(&mut self, amount: U128);
+    fn unstake(&mut self, amount: U128);
 }

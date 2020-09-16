@@ -20,6 +20,8 @@ const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
 /// Price per 1 byte of storage from mainnet genesis config.
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
+const NO_DEPOSIT: Balance = 0;
+
 pub type NumStakeShares = Balance;
 
 construct_uint! {
@@ -69,12 +71,22 @@ impl TokenAccount {
     }
 }
 
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct WithdrawAccount {
     // Claim 한 시점에서 토큰이 소각되고, 해당 balance만큼 기록됨
     pub claim_balance: Balance,
 
     // Near withdraw 가능한 시간 기록
     pub unstaked_available_epoch_height: EpochHeight,
+}
+
+impl WithdrawAccount {
+    pub fn new() -> Self {
+        Self {
+            claim_balance: 0,
+            unstaked_available_epoch_height: 0,
+        }
+    }
 }
 
 #[near_bindgen]
@@ -92,7 +104,7 @@ pub struct BondToken {
     /// 기본 18u8
     pub decimals: u8,
 
-    /// 토큰 계약 소유자
+    /// 토큰 계약 소유자 이자 검증인
     pub owner: AccountId,
 
     /// total token balance
@@ -119,7 +131,7 @@ impl BondToken {
     pub fn new() -> Self {
         // state가 있는지 확인.
         assert!(!env::state_exists(), "Already initialized");
-        let mut bt = Self {
+        Self {
             accounts: LookupMap::new(b"a".to_vec()),
             withdraws: LookupMap::new(b"a".to_vec()),
             decimals: 18u8,
@@ -127,8 +139,7 @@ impl BondToken {
             total_supply: 0u128,
             total_stake: 0u128,
             scale_factor: 1u128
-        };
-        bt
+        }
     }
 
     #[payable]
@@ -227,12 +238,61 @@ impl BondToken {
 
         validator::ext_validator::deposit_and_stake(&self.owner, amount, DEPOSIT_AND_STAKING_GAS);
 
-        let mut account = self.get_account(&self.owner);
+        let mut account = self.get_account(&owner_id);
         account.balance += amount;
 
         self.total_supply += amount;
 
         self.set_account(&owner_id, &account);
+        self.refund_storage(initial_storage);
+    }
+
+    pub fn burn(&mut self, amount: U128) {
+        let initial_storage = env::storage_usage();
+        let amount = amount.into();
+        if amount == 0 {
+            env::panic(b"Can't transfer 0 tokens");
+        }
+
+        let owner_id = env::predecessor_account_id();
+        // Retrieving the account from the state.
+        let mut account = self.get_account(&owner_id);
+
+        // Checking and updating unlocked balance
+        if account.balance < amount {
+            env::panic(b"Not enough balance");
+        }
+        account.balance -= amount;
+        self.set_account(&owner_id, &account);
+
+        let mut withdraw = self.get_withdraw(&owner_id);
+        withdraw.claim_balance += amount;
+
+        validator::ext_validator::unstake(amount.into(), &self.owner, NO_DEPOSIT, DEPOSIT_AND_STAKING_GAS);
+
+        self.set_withdraw(&owner_id, &withdraw);
+        self.refund_storage(initial_storage);
+    }
+
+    pub fn withdraw(&mut self, amount: U128) {
+        let initial_storage = env::storage_usage();
+
+        let amount = amount.into();
+        if amount == 0 {
+            env::panic(b"Can't transfer 0 tokens");
+        }
+
+        let owner_id = env::predecessor_account_id();
+
+        let mut withdraw = self.get_withdraw(&owner_id);
+        if withdraw.claim_balance < amount {
+            env::panic(b"Not enough balance");
+        }
+        withdraw.claim_balance -= amount;
+
+        validator::ext_validator::withdraw(amount.into(), &self.owner, NO_DEPOSIT, DEPOSIT_AND_STAKING_GAS);
+
+        self.set_withdraw(&owner_id, &withdraw);
         self.refund_storage(initial_storage);
     }
 
@@ -263,6 +323,12 @@ impl BondToken {
         self.accounts.get(&account_hash).unwrap_or_else(|| TokenAccount::new(account_hash))
     }
 
+    fn get_withdraw(&self, owner_id: &AccountId) -> WithdrawAccount {
+        assert!(env::is_valid_account_id(owner_id.as_bytes()), "Owner's account ID is invalid");
+        let account_hash = env::sha256(owner_id.as_bytes());
+        self.withdraws.get(&account_hash).unwrap_or_else(|| WithdrawAccount::new())
+    }
+
     /// Helper method to set the account details for `owner_id` to the state.
     fn set_account(&mut self, owner_id: &AccountId, account: &TokenAccount) {
         let account_hash = env::sha256(owner_id.as_bytes());
@@ -270,6 +336,15 @@ impl BondToken {
             self.accounts.insert(&account_hash, &account);
         } else {
             self.accounts.remove(&account_hash);
+        }
+    }
+
+    fn set_withdraw(&mut self, owner_id: &AccountId, withdraw: &WithdrawAccount) {
+        let account_hash = env::sha256(owner_id.as_bytes());
+        if withdraw.claim_balance > 0 {
+            self.withdraws.insert(&account_hash, &withdraw);
+        } else {
+            self.withdraws.remove(&account_hash);
         }
     }
 
