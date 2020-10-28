@@ -91,7 +91,7 @@ impl WithdrawAccount {
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct BondToken {
+pub struct YNear {
     /// for Token
     /// sha256(AccountId) -> Account Detail
     pub accounts: LookupMap<Vec<u8>, TokenAccount>,
@@ -118,14 +118,14 @@ pub struct BondToken {
 }
 
 /// 초기화 되기 전에 사용되는 것을 방지
-impl Default for BondToken {
+impl Default for YNear {
     fn default() -> Self {
         panic!("Fun token should be initialized before usage")
     }
 }
 
 #[near_bindgen]
-impl BondToken {
+impl YNear {
     
     #[init]
     pub fn new() -> Self {
@@ -315,7 +315,7 @@ impl BondToken {
 }
 
 /// Helper Function set.
-impl BondToken {
+impl YNear {
     /// Helper method to get the account details for `owner_id`.
     fn get_account(&self, owner_id: &AccountId) -> TokenAccount {
         assert!(env::is_valid_account_id(owner_id.as_bytes()), "Owner's account ID is invalid");
