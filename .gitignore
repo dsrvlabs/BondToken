@@ -5,7 +5,7 @@
 target
 **/target/
 **/pkg/
-res/**
+**/res/**
 
 # IDE
 .idea

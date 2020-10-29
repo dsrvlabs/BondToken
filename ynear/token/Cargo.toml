@@ -1,5 +1,5 @@
 [package]
-name = "bond_token"
+name = "token"
 version = "0.1.0"
 authors = ["Yoonsung <yoonsung@dsrvlabs.com>"]
 edition = "2018"

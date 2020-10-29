@@ -40,14 +40,20 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 # Install User Enviroment
 ENV DEBIAN_FRONTEND=noninteractive
+# if you want to change
 ENV TZ=Asia/Seoul
 RUN apt-get update \
     && apt-get -y install --no-install-recommends git iproute2 procps zsh python3-pip software-properties-common netcat locales locales-all \
     # locale
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
-    # timezone
+    #
+    # set timezone
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    #
+    # install rust toolchain nightly
+    # && rustup toolchain install nightly \
+    # && rustup target add wasm32-unknown-unknown --toolchain nightly \
     #
     # install Nearup
     # && curl --proto '=https' --tlsv1.2 -sSfL https://up.near.dev | python3 \
