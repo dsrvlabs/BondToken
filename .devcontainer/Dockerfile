@@ -44,6 +44,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 RUN apt-get update \
     && apt-get -y install --no-install-recommends git iproute2 procps zsh python3-pip software-properties-common netcat locales locales-all \
+    #
     # locale
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
@@ -51,25 +52,13 @@ RUN apt-get update \
     # set timezone
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     #
-    # install rust toolchain nightly
-    # && rustup toolchain install nightly \
-    # && rustup target add wasm32-unknown-unknown --toolchain nightly \
-    #
-    # install Nearup
-    # && curl --proto '=https' --tlsv1.2 -sSfL https://up.near.dev | python3 \
+    # install near-cli
+    && npm install -g near-cli \
     #
     # Clean up
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
-    #
-    # Install Dependencies for NearD 
-    # && apt-get update \
-    # && apt-get -y install git binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake gcc g++ python protobuf-compiler libssl-dev pkg-config clang llvm \
-    # && git clone https://github.com/nearprotocol/nearcore.git \
-    # && cd nearcore \
-    # && git checkout 1.11.1 \
-    # && make release
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8

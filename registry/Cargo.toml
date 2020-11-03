@@ -1,5 +1,5 @@
 [package]
-name = "token"
+name = "registry"
 version = "0.1.0"
 authors = ["Yoonsung <yoonsung@dsrvlabs.com>"]
 edition = "2018"
@@ -7,17 +7,6 @@ publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-
-[build]
-target = "wasm32-unknown-unknown"
-
-[profile.release]
-codegen-units = 1
-opt-level = "s" # Tell `rustc` to optimize for small code size.
-lto = true
-debug = false
-panic = "abort"
-overflow-checks = true
 
 [dependencies]
 near-sdk = "2.0.0"

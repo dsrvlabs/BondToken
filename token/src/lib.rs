@@ -6,7 +6,7 @@ use near_sdk::{
 };
 
 /// Price per 1 byte of storage from mainnet genesis config.
-const STORAGE_PRICE_PER_BYTE: Balance = 100000000000000000000;
+const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
 /// Contains balance and allowances information for one account.
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -62,7 +62,7 @@ pub struct ScaleToken {
 
 impl Default for ScaleToken {
     fn default() -> Self {
-        panic!("Fun token should be initialized before usage")
+        panic!("ScaleToken should be initialized before usage")
     }
 }
 
@@ -176,6 +176,7 @@ impl ScaleToken {
     }
 
     /// Mints given amount to the smart contract caller
+    #[allow(dead_code)]
     fn mint_to(&mut self, amount: u128, target: AccountId) -> U128 {
         let caller = env::predecessor_account_id();
         if caller != self.tokenizer {
@@ -183,10 +184,10 @@ impl ScaleToken {
         }
 
         self.total_supply += amount;
-        let mut a = self.get_account(&target);
-        a.balance += amount;
-        self.set_account(&target, &a);
-        a.balance.into()
+        let mut account = self.get_account(&target);
+        account.balance += amount;
+        self.set_account(&target, &account);
+        account.balance.into()
     }
 }
 

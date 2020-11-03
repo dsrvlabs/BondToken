@@ -2,12 +2,6 @@
 
 해당 환경은 Near Contract 개발을 위한 것으로, `🧑‍💻Visual Studio Code`, `🐋Docker for Mac`을 필요로 합니다.
 
-## 빌드 시작전에 수행이 필요한 작업
-```sh
-$ rustup toolchain install nightly
-$ rustup target add wasm32-unknown-unknown --toolchain nightly
-```
-
 ## 시작 방법
 
 ```sh
