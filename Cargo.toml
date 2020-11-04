@@ -1,15 +1,17 @@
-[package]
-name = "bond_token"
-version = "0.1.0"
-authors = ["Yoonsung <yoonsung@dsrvlabs.com>"]
-edition = "2018"
-publish = false
+# [alias]
+# b = "build"
+# c = "check"
+# t = "test"
+# r = "run"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+# [build]
+# target = "wasm32-unknown-unknown"
 
-[build]
-target = "wasm32-unknown-unknown"
+[workspace]
+members = [
+    "token",
+    "registry"
+]
 
 [profile.release]
 codegen-units = 1
@@ -18,17 +20,3 @@ lto = true
 debug = false
 panic = "abort"
 overflow-checks = true
-
-[dependencies]
-near-sdk = "2.0.0"
-uint = { version = "0.8.3", default-features = false }
-
-# [dev-dependencies]
-# lazy_static = "1.4.0"
-# quickcheck = "0.9"
-# quickcheck_macros = "0.9"
-# log = "0.4"
-# env_logger = { version = "0.7.1", default-features = false }
-# near-crypto = { git = "https://github.com/nearprotocol/nearcore.git" }
-# near-primitives = { git = "https://github.com/nearprotocol/nearcore.git" }
-# near-runtime-standalone = { git = "https://github.com/nearprotocol/nearcore.git" }

@@ -29,7 +29,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "mkdir -p /root/.ssh && cp -r /root/.ssh-localhost/* /root/.ssh && chmod 700 /root/.ssh && chmod 600 /root/.ssh/* && echo \"export PATH=/root/.nearup:${PATH}\nexport NODE_ENV=local\" >> ~/.zshrc",
+	"postCreateCommand": "mkdir -p /root/.ssh && cp -r /root/.ssh-localhost/* /root/.ssh && chmod 700 /root/.ssh && chmod 600 /root/.ssh/* && rustup toolchain install nightly && rustup target add wasm32-unknown-unknown --toolchain nightly && echo \"export PATH=/root/.nearup:${PATH}\nexport NODE_ENV=local\" >> ~/.zshrc",
 	// "runArgs": ["-v", "${env:HOME}${env:USERPROFILE}/.ssh:/root/.ssh-localhost:ro"]
 
 	// Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
