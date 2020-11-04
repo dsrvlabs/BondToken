@@ -28,7 +28,9 @@ $ ./build.sh
 
 ## Test
 ```sh
-# Contract가 위치한 폴더 내부
+# 전체 테스트
+$ cargo test
+# `fungible_token`만 테스트 하는 경우
 $ cargo test --package fungible_token -- --nocapture
 ```
 

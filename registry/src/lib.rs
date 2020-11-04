@@ -2,17 +2,14 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap};
 use near_sdk::{
     env, near_bindgen, AccountId
-    // , Balance, Promise, StorageUsage
 };
 
-/// Price per 1 byte of storage from mainnet genesis config.
-// const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
-
+// @TODO: Dynamic Ratio
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Registry {
     pub governance: AccountId,
-    pub validator_info: UnorderedMap<Vec<u8>, u32>,
+    pub validator_info: UnorderedMap<AccountId, u32>,
     pub validator_count: u32,
 }
 
@@ -26,7 +23,7 @@ impl Default for Registry {
 impl Registry {
     #[init]
     pub fn new (governance: AccountId) -> Self {
-        assert!(!env::state_exists(), "Already initialized");
+        assert!(!env::state_exists(), "Registry: Already initialized");
         Self {
             governance,
             validator_info: UnorderedMap::new(b"a".to_vec()),
@@ -34,77 +31,48 @@ impl Registry {
         }
     }
 
-    pub fn add_validator(&mut self, validator: &AccountId, ratio: u32) {
+    pub fn add_validator(&mut self, validator: AccountId, ratio: u32) {
         let caller = env::predecessor_account_id();
         if caller != self.governance {
-            env::panic(b"Caller is not Governance");
+            env::panic(b"Registry: Caller is not Governance");
         }
-        let validator_hash = env::sha256(validator.as_bytes());
-        if self.validator_info.insert(&validator_hash, &ratio).is_none() {
+        if self.validator_info.insert(&validator, &ratio).is_none() {
             self.validator_count += 1;
         } else {
             env::panic(b"Registry: Already exist Validator");
         }
     }
 
-    pub fn del_validator(&mut self, validator: &AccountId) {
+    pub fn del_validator(&mut self, validator: AccountId) {
         let caller = env::predecessor_account_id();
         if caller != self.governance {
-            env::panic(b"Caller is not Governance");
+            env::panic(b"Registry: Caller is not Governance");
         }
-        let validator_hash = env::sha256(validator.as_bytes());
-        if self.validator_info.remove(&validator_hash).is_some() {
+        if self.validator_info.remove(&validator).is_some() {
             self.validator_count -= 1;
         } else {
-            env::panic(b"Registry: Already non-exist Validator");
+            env::panic(b"Registry: Non-exist Validator");
         }
     }
 
-    pub fn update_validator(&mut self, validator: &AccountId, ratio: u32) {
+    pub fn update_validator(&mut self, validator: AccountId, ratio: u32) {
         let caller = env::predecessor_account_id();
         if caller != self.governance {
-            env::panic(b"Caller is not Governance");
+            env::panic(b"Registry: Caller is not Governance");
         }
-        let validator_hash = env::sha256(validator.as_bytes());
-        if self.validator_info.insert(&validator_hash, &ratio).is_none() {
-            env::panic(b"Registry: Already non-exist Validator");
+        if self.validator_info.insert(&validator, &ratio).is_none() {
+            env::panic(b"Registry: Non-exist Validator");
         }
     }
 
-    pub fn get_validators(&self) -> Vec<(std::vec::Vec<u8>, u32)> {
+    pub fn get_validators(&self) -> Vec<(AccountId, u32)> {
         self.validator_info.to_vec()
     }
 
-    pub fn get_validator_ratio(&self, validator: &AccountId) -> Option<u32> {
-        let validator_hash = env::sha256(validator.as_bytes());
-        self.validator_info.get(&validator_hash)
+    pub fn get_validator_ratio(&self, validator: AccountId) -> Option<u32> {
+        self.validator_info.get(&validator)
     }
 }
-
-// impl Registry {
-//     fn refund_storage(&self, initial_storage: StorageUsage) {
-//         let current_storage = env::storage_usage();
-//         let attached_deposit = env::attached_deposit();
-//         let refund_amount = if current_storage > initial_storage {
-//             let required_deposit =
-//                 Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
-//             assert!(
-//                 required_deposit <= attached_deposit,
-//                 "The required attached deposit is {}, but the given attached deposit is is {}",
-//                 required_deposit,
-//                 attached_deposit,
-//             );
-//             attached_deposit - required_deposit
-//         } else {
-//             attached_deposit
-//                 + Balance::from(initial_storage - current_storage) * STORAGE_PRICE_PER_BYTE
-//         };
-//         if refund_amount > 0 {
-//             env::log(format!("Refunding {} tokens for storage", refund_amount).as_bytes());
-//             Promise::new(env::predecessor_account_id()).transfer(refund_amount);
-//         }
-//     }
-// }
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -128,13 +96,13 @@ mod tests {
         "alice.near".to_string()
     }
 
-    fn bob() -> AccountId {
-        "bob.near".to_string()
-    }
+    // fn bob() -> AccountId {
+    //     "bob.near".to_string()
+    // }
 
-    fn carol() -> AccountId {
-        "carol.near".to_string()
-    }
+    // fn carol() -> AccountId {
+    //     "carol.near".to_string()
+    // }
     // end of Validator List
 
     fn get_context(predecessor_account_id: AccountId) -> VMContext {
@@ -164,9 +132,142 @@ mod tests {
         testing_env!(context);
         let contract = Registry::new(governance());
         assert_eq!(contract.validator_count, 0);
+    }
 
-        // assert_eq!(contract.get_total_supply().0, total_supply);
-        // assert_eq!(contract.get_balance(tokenizer()).0, total_supply);
+    #[test]
+    fn test_add_validator_with_get_ratio() {
+        let _ratio: u32 = 10;
+
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+        contract.add_validator(alice(), _ratio);
+
+        assert_eq!(contract.validator_count, 1);
+        assert_eq!(contract.get_validator_ratio(alice()), Some(_ratio));
+    }
+
+    #[test]
+    #[should_panic(expected = "Registry: Caller is not Governance")]
+    fn test_add_validator_with_non_governance_call() {
+        let _ratio: u32 = 10;
+
+        let context = get_context(deployer());
+        testing_env!(context);
+
+        let mut contract = Registry::new(governance());
+        contract.add_validator(alice(), _ratio);
+    }
+
+    #[test]
+    fn test_add_validator_with_get_all_validators() {
+        let _ratio: u32 = 10;
+
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+        contract.add_validator(alice(), _ratio);
+        assert_eq!(contract.validator_count, 1);
+        assert_eq!(contract.get_validators(), vec![(alice(), _ratio)]);
+    }
+
+    #[test]
+    fn test_del_validator() {
+        let _ratio: u32 = 10;
+
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+
+        contract.add_validator(alice(), _ratio);
+        contract.del_validator(alice());
+        assert_eq!(contract.validator_count, 0);
+        assert_eq!(contract.get_validators(), vec![]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Registry: Caller is not Governance")]
+    fn test_del_validator_with_non_governance_call() {
+        let context = get_context(deployer());
+        testing_env!(context);
+
+        let mut contract = Registry::new(governance());
+        contract.del_validator(alice());
+    }
+
+    #[test]
+    #[should_panic(expected = "Registry: Non-exist Validator")]
+    fn test_del_validator_with_non_registred_validators() {
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+        contract.del_validator(alice());
+    }
+
+    #[test]
+    fn test_update_validator() {
+        let _ratio = 10u32;
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+
+        contract.add_validator(alice(), _ratio);
+        contract.update_validator(alice(), _ratio + 11u32);
+
+        assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+    }
+
+    #[test]
+    #[should_panic(expected = "Registry: Caller is not Governance")]
+    fn test_update_validator_with_non_governance_call() {
+        let _ratio = 10u32;
+        let context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        testing_env!(context.clone());
+
+        contract.update_validator(alice(), _ratio + 11u32);
+    }
+
+    #[test]
+    #[should_panic(expected = "Registry: Non-exist Validator")]
+    fn test_update_validator_with_non_exist_validator() {
+        let _ratio = 10u32;
+        let mut context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let mut contract = Registry::new(governance());
+        context.predecessor_account_id = governance();
+        testing_env!(context.clone());
+
+        contract.update_validator(alice(), _ratio + 11u32);
+
+        // assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+    }
+
+    #[test]
+    fn test_get_validator_ratio_with_non_exist() {
+        let context = get_context(deployer());
+        testing_env!(context.clone());
+
+        let contract = Registry::new(governance());
+        assert_eq!(contract.get_validator_ratio(alice()), None);
     }
 
     // #[test]

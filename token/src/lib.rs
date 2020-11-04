@@ -5,6 +5,8 @@ use near_sdk::{
     env, near_bindgen, AccountId, Balance, Promise, StorageUsage
 };
 
+//@TODO: Scale factor
+
 /// Price per 1 byte of storage from mainnet genesis config.
 const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
