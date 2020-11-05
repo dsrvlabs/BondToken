@@ -10,7 +10,8 @@
 [workspace]
 members = [
     "token",
-    "registry"
+    "registry",
+    "tokenizer"
 ]
 
 [profile.release]

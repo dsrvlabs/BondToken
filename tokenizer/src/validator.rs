@@ -2,7 +2,7 @@ use near_sdk::ext_contract;
 use near_sdk::json_types::U128;
 
 #[ext_contract(ext_validator)]
-pub trait validator {
+pub trait ext_validator {
     /// Deposits the attached amount into the inner account of the predecessor.
     // #[payable]
     fn deposit(&mut self);

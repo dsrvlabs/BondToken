@@ -457,6 +457,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokenizer"
+version = "0.1.0"
+dependencies = [
+ "near-sdk",
+ "registry",
+ "token",
+ "uint",
+]
+
+[[package]]
 name = "typenum"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

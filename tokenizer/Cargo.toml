@@ -8,19 +8,8 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[build]
-target = "wasm32-unknown-unknown"
-
 [dependencies]
 near-sdk = "2.0.0"
 uint = { version = "0.8.3", default-features = false }
-
-# [dev-dependencies]
-# lazy_static = "1.4.0"
-# quickcheck = "0.9"
-# quickcheck_macros = "0.9"
-# log = "0.4"
-# env_logger = { version = "0.7.1", default-features = false }
-# near-crypto = { git = "https://github.com/nearprotocol/nearcore.git" }
-# near-primitives = { git = "https://github.com/nearprotocol/nearcore.git" }
-# near-runtime-standalone = { git = "https://github.com/nearprotocol/nearcore.git" }
+token = { path = "../token" }
+registry = { path = "../registry" }

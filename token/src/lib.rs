@@ -5,6 +5,11 @@ use near_sdk::{
     env, near_bindgen, AccountId, Balance, Promise, StorageUsage
 };
 
+pub mod nep21;
+
+#[global_allocator]
+static ALLOC: near_sdk::wee_alloc::WeeAlloc<'_> = near_sdk::wee_alloc::WeeAlloc::INIT;
+
 //@TODO: Scale factor
 
 /// Price per 1 byte of storage from mainnet genesis config.
