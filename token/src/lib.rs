@@ -79,13 +79,12 @@ impl ScaleToken {
     #[init]
     pub fn new(tokenizer_id: AccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
-        let st = Self {
+        Self {
             accounts: LookupMap::new(b"a".to_vec()),
             total_supply: 0u128,
             decimals: 18u8,
             tokenizer: tokenizer_id
-        };
-        st
+        }
     }
 
     pub fn decimals(&self) -> u8 {
