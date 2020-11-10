@@ -1767,7 +1767,6 @@ dependencies = [
  "near-runtime-standalone",
  "near-sdk",
  "near-vm-errors 2.2.0 (git+https://github.com/nearprotocol/nearcore.git)",
- "registry",
  "token",
  "uint",
 ]

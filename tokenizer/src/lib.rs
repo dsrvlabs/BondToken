@@ -3,29 +3,21 @@ use near_sdk::{
     env, near_bindgen, AccountId, Balance, PromiseResult
 };
 
-/**
- * external contract interface load.
- */ 
-// use token::{nep21};
-// use registry::{registry};
-use token::ScaleToken;
-use registry::Registry;
-pub mod utils;
-mod validator;
+pub use crate::types::{Registry};
+pub use crate::internal::*;
+
+pub mod types;
+pub mod internal;
 
 #[global_allocator]
 static ALLOC: near_sdk::wee_alloc::WeeAlloc<'_> = near_sdk::wee_alloc::WeeAlloc::INIT;
-
-const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
-const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
-const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Tokenizer {
     token: AccountId,
     governance: AccountId,
-    registry: AccountId,
+    registry: Registry,
 }
 
 impl Default for Tokenizer {
@@ -36,265 +28,310 @@ impl Default for Tokenizer {
 
 #[near_bindgen]
 impl Tokenizer {
-
     #[init]
-    pub fn new(governance: AccountId, registry: AccountId) -> Self {
+    pub fn new(governance: AccountId) -> Self {
         assert!(!env::state_exists(), "Registry: Already initialized");
         Self {
             token: "".to_string(),
             governance,
-            registry
+            registry: Registry::new()
         }
     }
 
-    pub fn set_token(&mut self, token: AccountId) {
-        let caller = env::predecessor_account_id();
-        if caller != self.governance {
-            env::panic(b"Caller is not Governance");
-        }
-        self.token = token;
+    pub fn add_validator(&mut self, validator: AccountId, ratio: u32) {
+        self.assert_governance();
+        self.registry.add_validator(validator, ratio);
     }
 
-    pub fn deposit(&self) {
-        let owner_id = env::predecessor_account_id();
-        let deposit = env::attached_deposit();
-
-        let receipt = env::promise_create(
-            self.registry.clone(),
-            b"get_validators",
-            &[],
-            0,
-            SINGLE_CALL_GAS,
-        );
-
-        let validators_bytes = match env::promise_result(receipt) {
-            PromiseResult::Successful(x) => x,
-            PromiseResult::Failed => env::panic(b"The promise failed. See receipt failures."),
-            PromiseResult::NotReady => env::panic(b"The promise was not ready."),
-        };
-
-        let validator_info = Vec<>::From(&validators_bytes);
-
-        for (validator, ratio) in validator_info {
-            let amount = (deposit / 10000) * ratio;
-            println!("{:?}, {:?}", validator, amount);
-            // validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
-        }
+    pub fn del_validator(&mut self, validator: AccountId) {
+        self.assert_governance();
+        self.registry.del_validator(validator);
     }
 
-    // fn deposit_and_stake(&mut self, validator: AccountId, amount: Balance) {
-    //     validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
-    //     env::log(format!("{} to staking amount {}", validator, amount).as_bytes());
-    // }
-
-    // #[result_serializer(borsh)]
-    // fn validators(&self) -> Promise {
-    //     registry::ext_registry::get_validators(&self.registry, 0, DEPOSIT_AND_STAKING_GAS)
-    // }
+    pub fn update_validator(&mut self, validator: AccountId, ratio: u32) {
+        self.assert_governance();
+        self.registry.update_validator(validator, ratio);
+    }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(test)]
-mod tests {
-    use near_sdk::MockedBlockchain;
-    use near_sdk::{testing_env, VMContext};
+/**
+ * external contract interface load.
+ */ 
+// use token::{nep21};
+// use registry::{registry};
+// use token::ScaleToken;
+// pub mod utils;
+// mod validator;
 
-    use super::*;
 
-    /// Governance Account
-    fn governance() -> AccountId {
-        "governance.near".to_string()
-    }
+// const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
+// const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+// const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
 
-    fn deployer() -> AccountId {
-        "deployer.near".to_string()
-    }
 
-    // start Validator List
-    fn alice() -> AccountId {
-        "alice.near".to_string()
-    }
 
-    // fn bob() -> AccountId {
-    //     "bob.near".to_string()
-    // }
 
-    // fn carol() -> AccountId {
-    //     "carol.near".to_string()
-    // }
-    // end of Validator List
+// #[near_bindgen]
+// impl Tokenizer {
 
-    fn get_context(predecessor_account_id: AccountId) -> VMContext {
-        VMContext {
-            current_account_id: governance(),
-            signer_account_id: governance(),
-            signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id,
-            input: vec![],
-            block_index: 0,
-            block_timestamp: 0,
-            account_balance: 1_000_000_000_000_000_000_000_000_000u128,
-            account_locked_balance: 0,
-            storage_usage: 10u64.pow(6),
-            attached_deposit: 0,
-            prepaid_gas: 10u64.pow(18),
-            random_seed: vec![0, 1, 2],
-            is_view: false,
-            output_data_receivers: vec![],
-            epoch_height: 0,
-        }
-    }
+//     #[init]
+//     pub fn new(governance: AccountId, registry: AccountId) -> Self {
+//         assert!(!env::state_exists(), "Registry: Already initialized");
+//         Self {
+//             token: "".to_string(),
+//             governance,
+//             registry: Registry::new()
+//         }
+//     }
 
-    // #[test]
-    // fn test_intialize_new_tokenizer() {
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     pub fn set_token(&mut self, token: AccountId) {
+//         let caller = env::predecessor_account_id();
+//         if caller != self.governance {
+//             env::panic(b"Caller is not Governance");
+//         }
+//         self.token = token;
+//     }
 
-    //     let registry = Registry::new(governance());
-    //     let tokenizer = Tokenizer::new(governance(), registry);
-    // }
+//     pub fn deposit(&self) {
+//         let owner_id = env::predecessor_account_id();
+//         let deposit = env::attached_deposit();
 
-    // #[test]
-    // fn test_initialize_new_registry() {
-    //     let context = get_context(deployer());
-    //     testing_env!(context);
-    //     let contract = Registry::new(governance());
-    //     assert_eq!(contract.validator_count, 0);
-    // }
+//         let receipt = env::promise_create(
+//             self.registry.clone(),
+//             b"get_validators",
+//             &[],
+//             0,
+//             SINGLE_CALL_GAS,
+//         );
 
-    // #[test]
-    // fn test_add_validator_with_get_ratio() {
-    //     let _ratio: u32 = 10;
+//         let validators_bytes = match env::promise_result(receipt) {
+//             PromiseResult::Successful(x) => x,
+//             PromiseResult::Failed => env::panic(b"The promise failed. See receipt failures."),
+//             PromiseResult::NotReady => env::panic(b"The promise was not ready."),
+//         };
 
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//         let validator_info = Vec<>::From(&validators_bytes);
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
-    //     contract.add_validator(alice(), _ratio);
+//         for (validator, ratio) in validator_info {
+//             let amount = (deposit / 10000) * ratio;
+//             println!("{:?}, {:?}", validator, amount);
+//             // validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
+//         }
+//     }
 
-    //     assert_eq!(contract.validator_count, 1);
-    //     assert_eq!(contract.get_validator_ratio(alice()), Some(_ratio));
-    // }
+//     // fn deposit_and_stake(&mut self, validator: AccountId, amount: Balance) {
+//     //     validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
+//     //     env::log(format!("{} to staking amount {}", validator, amount).as_bytes());
+//     // }
 
-    // #[test]
-    // #[should_panic(expected = "Registry: Caller is not Governance")]
-    // fn test_add_validator_with_non_governance_call() {
-    //     let _ratio: u32 = 10;
+//     // #[result_serializer(borsh)]
+//     // fn validators(&self) -> Promise {
+//     //     registry::ext_registry::get_validators(&self.registry, 0, DEPOSIT_AND_STAKING_GAS)
+//     // }
+// }
 
-    //     let context = get_context(deployer());
-    //     testing_env!(context);
+// #[cfg(not(target_arch = "wasm32"))]
+// #[cfg(test)]
+// mod tests {
+//     use near_sdk::MockedBlockchain;
+//     use near_sdk::{testing_env, VMContext};
 
-    //     let mut contract = Registry::new(governance());
-    //     contract.add_validator(alice(), _ratio);
-    // }
+//     use super::*;
 
-    // #[test]
-    // fn test_add_validator_with_get_all_validators() {
-    //     let _ratio: u32 = 10;
+//     /// Governance Account
+//     fn governance() -> AccountId {
+//         "governance.near".to_string()
+//     }
 
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     fn deployer() -> AccountId {
+//         "deployer.near".to_string()
+//     }
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
-    //     contract.add_validator(alice(), _ratio);
-    //     assert_eq!(contract.validator_count, 1);
-    //     assert_eq!(contract.get_validators(), vec![(alice(), _ratio)]);
-    // }
+//     // start Validator List
+//     fn alice() -> AccountId {
+//         "alice.near".to_string()
+//     }
 
-    // #[test]
-    // fn test_del_validator() {
-    //     let _ratio: u32 = 10;
+//     // fn bob() -> AccountId {
+//     //     "bob.near".to_string()
+//     // }
 
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     // fn carol() -> AccountId {
+//     //     "carol.near".to_string()
+//     // }
+//     // end of Validator List
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
+//     fn get_context(predecessor_account_id: AccountId) -> VMContext {
+//         VMContext {
+//             current_account_id: governance(),
+//             signer_account_id: governance(),
+//             signer_account_pk: vec![0, 1, 2],
+//             predecessor_account_id,
+//             input: vec![],
+//             block_index: 0,
+//             block_timestamp: 0,
+//             account_balance: 1_000_000_000_000_000_000_000_000_000u128,
+//             account_locked_balance: 0,
+//             storage_usage: 10u64.pow(6),
+//             attached_deposit: 0,
+//             prepaid_gas: 10u64.pow(18),
+//             random_seed: vec![0, 1, 2],
+//             is_view: false,
+//             output_data_receivers: vec![],
+//             epoch_height: 0,
+//         }
+//     }
 
-    //     contract.add_validator(alice(), _ratio);
-    //     contract.del_validator(alice());
-    //     assert_eq!(contract.validator_count, 0);
-    //     assert_eq!(contract.get_validators(), vec![]);
-    // }
+//     // #[test]
+//     // fn test_intialize_new_tokenizer() {
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-    // #[test]
-    // #[should_panic(expected = "Registry: Caller is not Governance")]
-    // fn test_del_validator_with_non_governance_call() {
-    //     let context = get_context(deployer());
-    //     testing_env!(context);
+//     //     let registry = Registry::new(governance());
+//     //     let tokenizer = Tokenizer::new(governance(), registry);
+//     // }
 
-    //     let mut contract = Registry::new(governance());
-    //     contract.del_validator(alice());
-    // }
+//     // #[test]
+//     // fn test_initialize_new_registry() {
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context);
+//     //     let contract = Registry::new(governance());
+//     //     assert_eq!(contract.validator_count, 0);
+//     // }
 
-    // #[test]
-    // #[should_panic(expected = "Registry: Non-exist Validator")]
-    // fn test_del_validator_with_non_registred_validators() {
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     // #[test]
+//     // fn test_add_validator_with_get_ratio() {
+//     //     let _ratio: u32 = 10;
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
-    //     contract.del_validator(alice());
-    // }
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-    // #[test]
-    // fn test_update_validator() {
-    //     let _ratio = 10u32;
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.add_validator(alice(), _ratio);
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
+//     //     assert_eq!(contract.validator_count, 1);
+//     //     assert_eq!(contract.get_validator_ratio(alice()), Some(_ratio));
+//     // }
 
-    //     contract.add_validator(alice(), _ratio);
-    //     contract.update_validator(alice(), _ratio + 11u32);
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_add_validator_with_non_governance_call() {
+//     //     let _ratio: u32 = 10;
 
-    //     assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
-    // }
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context);
 
-    // #[test]
-    // #[should_panic(expected = "Registry: Caller is not Governance")]
-    // fn test_update_validator_with_non_governance_call() {
-    //     let _ratio = 10u32;
-    //     let context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     //     let mut contract = Registry::new(governance());
+//     //     contract.add_validator(alice(), _ratio);
+//     // }
 
-    //     let mut contract = Registry::new(governance());
-    //     testing_env!(context.clone());
+//     // #[test]
+//     // fn test_add_validator_with_get_all_validators() {
+//     //     let _ratio: u32 = 10;
 
-    //     contract.update_validator(alice(), _ratio + 11u32);
-    // }
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-    // #[test]
-    // #[should_panic(expected = "Registry: Non-exist Validator")]
-    // fn test_update_validator_with_non_exist_validator() {
-    //     let _ratio = 10u32;
-    //     let mut context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.add_validator(alice(), _ratio);
+//     //     assert_eq!(contract.validator_count, 1);
+//     //     assert_eq!(contract.get_validators(), vec![(alice(), _ratio)]);
+//     // }
 
-    //     let mut contract = Registry::new(governance());
-    //     context.predecessor_account_id = governance();
-    //     testing_env!(context.clone());
+//     // #[test]
+//     // fn test_del_validator() {
+//     //     let _ratio: u32 = 10;
 
-    //     contract.update_validator(alice(), _ratio + 11u32);
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-    //     // assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
-    // }
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
 
-    // #[test]
-    // fn test_get_validator_ratio_with_non_exist() {
-    //     let context = get_context(deployer());
-    //     testing_env!(context.clone());
+//     //     contract.add_validator(alice(), _ratio);
+//     //     contract.del_validator(alice());
+//     //     assert_eq!(contract.validator_count, 0);
+//     //     assert_eq!(contract.get_validators(), vec![]);
+//     // }
 
-    //     let contract = Registry::new(governance());
-    //     assert_eq!(contract.get_validator_ratio(alice()), None);
-    // }
-}
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_del_validator_with_non_governance_call() {
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context);
+
+//     //     let mut contract = Registry::new(governance());
+//     //     contract.del_validator(alice());
+//     // }
+
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Non-exist Validator")]
+//     // fn test_del_validator_with_non_registred_validators() {
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.del_validator(alice());
+//     // }
+
+//     // #[test]
+//     // fn test_update_validator() {
+//     //     let _ratio = 10u32;
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+
+//     //     contract.add_validator(alice(), _ratio);
+//     //     contract.update_validator(alice(), _ratio + 11u32);
+
+//     //     assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+//     // }
+
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_update_validator_with_non_governance_call() {
+//     //     let _ratio = 10u32;
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let mut contract = Registry::new(governance());
+//     //     testing_env!(context.clone());
+
+//     //     contract.update_validator(alice(), _ratio + 11u32);
+//     // }
+
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Non-exist Validator")]
+//     // fn test_update_validator_with_non_exist_validator() {
+//     //     let _ratio = 10u32;
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+
+//     //     contract.update_validator(alice(), _ratio + 11u32);
+
+//     //     // assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+//     // }
+
+//     // #[test]
+//     // fn test_get_validator_ratio_with_non_exist() {
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let contract = Registry::new(governance());
+//     //     assert_eq!(contract.get_validator_ratio(alice()), None);
+//     // }
+// }

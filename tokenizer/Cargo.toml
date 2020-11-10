@@ -12,7 +12,6 @@ crate-type = ["cdylib", "rlib"]
 near-sdk = "2.0.0"
 uint = { version = "0.8.3", default-features = false }
 token = { path = "../token" }
-registry = { path = "../registry" }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
