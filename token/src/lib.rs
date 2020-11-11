@@ -183,7 +183,7 @@ impl ScaleToken {
 
     /// Mints given amount to the smart contract caller
     #[allow(dead_code)]
-    fn mint_to(&mut self, amount: u128, target: AccountId) -> U128 {
+    pub fn mint_to(&mut self, amount: u128, target: AccountId) -> U128 {
         let caller = env::predecessor_account_id();
         if caller != self.tokenizer {
             env::panic(b"Caller is not Tokenizer");
@@ -194,6 +194,35 @@ impl ScaleToken {
         account.balance += amount;
         self.set_account(&target, &account);
         account.balance.into()
+    }
+
+    #[allow(dead_code)]
+    pub fn burn_from(&mut self, amount: u128, target: AccountId) {
+        let caller = env::predecessor_account_id();
+        if caller != self.tokenizer {
+            env::panic(b"Caller is not Tokenizer");
+        }
+
+        // Retrieving the account from the state.
+        let mut account = self.get_account(&target);
+
+        // Checking and updating unlocked balance
+        if account.balance <= amount {
+            env::panic(b"Not enough balance");
+        }
+        account.balance -= amount;
+
+        // If transferring by escrow, need to check and update allowance.
+        if caller != target {
+            let allowance = account.get_allowance(&caller);
+            if allowance < amount {
+                env::panic(b"Not enough allowance");
+            }
+            account.set_allowance(&caller, allowance - amount);
+        }
+
+        self.total_supply -= amount;
+        self.set_account(&target, &account);
     }
 }
 

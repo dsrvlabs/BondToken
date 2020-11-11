@@ -1,23 +1,77 @@
+use near_sdk::ext_contract;
+use near_sdk::collections::{LookupMap};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::json_types::U128;
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, PromiseResult
+    env, near_bindgen, AccountId, Balance
 };
 
-pub use crate::types::{Registry};
+pub use crate::registry::{Registry};
+pub use crate::types::*;
 pub use crate::internal::*;
 
+pub mod registry;
 pub mod types;
 pub mod internal;
 
 #[global_allocator]
 static ALLOC: near_sdk::wee_alloc::WeeAlloc<'_> = near_sdk::wee_alloc::WeeAlloc::INIT;
 
+#[ext_contract(ext_validator)]
+pub trait ExtValidator {
+    /// Deposits the attached amount into the inner account of the predecessor.
+    // #[payable]
+    fn deposit(&mut self);
+
+    /// Deposits the attached amount into the inner account of the predecessor and stakes it.
+    // #[payable]
+    fn deposit_and_stake(&mut self);
+
+    /// Withdraws the entire unstaked balance from the predecessor account.
+    /// It's only allowed if the `unstake` action was not performed in the four most recent epochs.
+    fn withdraw_all(&mut self);
+
+    /// Withdraws the non staked balance for given account.
+    /// It's only allowed if the `unstake` action was not performed in the four most recent epochs.
+    fn withdraw(&mut self, amount: U128);
+
+    /// Stakes all available unstaked balance from the inner account of the predecessor.
+    fn stake_all(&mut self);
+
+    /// Stakes the given amount from the inner account of the predecessor.
+    /// The inner account should have enough unstaked balance.
+    fn stake(&mut self, amount: U128);
+
+    /// Unstakes all staked balance from the inner account of the predecessor.
+    /// The new total unstaked balance will be available for withdrawal in four epochs.
+    fn unstake_all(&mut self);
+
+    /// Unstakes the given amount from the inner account of the predecessor.
+    /// The inner account should have enough staked balance.
+    /// The new total unstaked balance will be available for withdrawal in four epochs.
+    fn unstake(&mut self, amount: U128);
+}
+
+#[ext_contract(ext_ft)]
+pub trait ExtFT {
+    fn transfer(&mut self, dest: AccountId, amount: U128);
+
+    fn transfer_from(&mut self, from: AccountId, dest: AccountId, amount: U128);
+
+    fn mint_to(&mut self, amount: u128, target: AccountId) -> U128;
+    fn burn_from(&mut self, amount: u128, target: AccountId);
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Tokenizer {
     token: AccountId,
+    /// for withdraws
+    /// sha256(AccountId) -> Withdrawer Detail
+    withdraws: LookupMap<Vec<u8>, WithdrawAccount>,
     governance: AccountId,
     registry: Registry,
+    total_waiting: Balance
 }
 
 impl Default for Tokenizer {
@@ -33,30 +87,15 @@ impl Tokenizer {
         assert!(!env::state_exists(), "Registry: Already initialized");
         Self {
             token: "".to_string(),
+            withdraws: LookupMap::new(b"a".to_vec()),
             governance,
-            registry: Registry::new()
+            registry: Registry::new(),
+            total_waiting: 0.into()
         }
-    }
-
-    pub fn add_validator(&mut self, validator: AccountId, ratio: u32) {
-        self.assert_governance();
-        self.registry.add_validator(validator, ratio);
-    }
-
-    pub fn del_validator(&mut self, validator: AccountId) {
-        self.assert_governance();
-        self.registry.del_validator(validator);
-    }
-
-    pub fn update_validator(&mut self, validator: AccountId, ratio: u32) {
-        self.assert_governance();
-        self.registry.update_validator(validator, ratio);
     }
 }
 
-/**
- * external contract interface load.
- */ 
+
 // use token::{nep21};
 // use registry::{registry};
 // use token::ScaleToken;

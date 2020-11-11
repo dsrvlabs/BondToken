@@ -1,49 +1,33 @@
 use crate::*;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::collections::{UnorderedMap};
-use near_sdk::{near_bindgen, AccountId, Promise, PublicKey};
+use near_sdk::{near_bindgen, AccountId, Promise, PublicKey, Balance, EpochHeight};
+use uint::construct_uint;
 
-#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
-// #[serde(crate = "near_sdk::serde")]
-pub struct Registry {
-    pub validator_info: UnorderedMap<AccountId, u32>,
-    pub validator_count: u32,
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
 }
 
-impl Registry {
+const NO_DEPOSIT: u128 = 0;
+
+const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct WithdrawAccount {
+    // Claim 한 시점에서 토큰이 소각되고, 해당 balance만큼 기록됨
+    pub claim_balance: Balance,
+
+    // Near withdraw 가능한 시간 기록
+    pub unstaked_available_epoch_height: EpochHeight,
+}
+
+impl WithdrawAccount {
     pub fn new() -> Self {
         Self {
-            validator_info: UnorderedMap::new(b"a".to_vec()),
-            validator_count: 0
+            claim_balance: 0,
+            unstaked_available_epoch_height: 0,
         }
-    }
-
-    pub fn add_validator(&mut self, validator: AccountId, ratio: u32) {
-        if self.validator_info.insert(&validator, &ratio).is_none() {
-            self.validator_count += 1;
-        } else {
-            env::panic(b"Registry: Already exist Validator");
-        }
-    }
-
-    pub fn del_validator(&mut self, validator: AccountId) {
-        if self.validator_info.remove(&validator).is_some() {
-            self.validator_count -= 1;
-        } else {
-            env::panic(b"Registry: Non-exist Validator");
-        }
-    }
-
-    pub fn update_validator(&mut self, validator: AccountId, ratio: u32) {
-        if self.validator_info.insert(&validator, &ratio).is_none() {
-            env::panic(b"Registry: Non-exist Validator");
-        }
-    }
-
-    pub fn get_validators(&self) -> Vec<(AccountId, u32)> {
-        self.validator_info.to_vec()
-    }
-
-    pub fn get_validator_ratio(&self, validator: AccountId) -> Option<u32> {
-        self.validator_info.get(&validator)
     }
 }
