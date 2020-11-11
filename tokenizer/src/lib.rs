@@ -59,6 +59,7 @@ pub trait ExtFT {
     fn transfer_from(&mut self, from: AccountId, dest: AccountId, amount: U128);
 
     fn mint_to(&mut self, amount: u128, target: AccountId) -> U128;
+    
     fn burn_from(&mut self, amount: u128, target: AccountId);
 }
 
@@ -90,7 +91,7 @@ impl Tokenizer {
             withdraws: LookupMap::new(b"a".to_vec()),
             governance,
             registry: Registry::new(),
-            total_waiting: 0.into()
+            total_waiting: 0
         }
     }
 }

@@ -10,7 +10,6 @@
 [workspace]
 members = [
     "token",
-    "registry",
     "tokenizer"
 ]
 

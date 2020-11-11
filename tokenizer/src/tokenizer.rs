@@ -27,6 +27,9 @@ impl Tokenizer {
         // using promise?
         ext_ft::burn_from(amount, owner_id, &self.token, NO_DEPOSIT, SINGLE_CALL_GAS);
 
+        // undelegate near with ratio
+        self.undelegate(amount);
+
         // withdraw에 등록
         let mut withdraw = self.get_withdraw(owner_id);
         withdraw.claim_balance += amount;
@@ -37,7 +40,15 @@ impl Tokenizer {
 
     // @TODO: burn 할 때 언스테이크 호출 함수
     fn undelegate(&self, amount: Balance) {
+        let mut total_ratio;
+        for tuple in self.registry.get_validators().iter() {
+            total_ratio += tuple.1;
+        }
 
+        for tuple in self.registry.get_validators().iter() {
+            let mut amount * (tuple.1.into() / total_ratio);
+            ext_validator::unstake(amount, &tuple.0, NO_DEPOSIT, SINGLE_CALL_GAS);
+        }
     }
 
     // @TODO: burn 이후에 대기 상태에 있는 Near를 출금할 수 있도록 하는 함수

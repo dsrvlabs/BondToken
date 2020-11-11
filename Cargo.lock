@@ -1415,14 +1415,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
 
 [[package]]
-name = "registry"
-version = "0.1.0"
-dependencies = [
- "near-sdk",
- "uint",
-]
-
-[[package]]
 name = "rocksdb"
 version = "0.14.0"
 source = "git+https://github.com/nearprotocol/rust-rocksdb?branch=disable-thread#44592812fd12cc2ea5de55af7c8d9bfdeacac692"
