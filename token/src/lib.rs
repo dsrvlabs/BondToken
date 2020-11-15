@@ -18,7 +18,7 @@ const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 /// Contains balance and allowances information for one account.
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    pub balance: Balance,
+    pub credit: Balance,
     pub allowances: LookupMap<Vec<u8>, Balance>,
     pub allowances_count: u32,
 }
@@ -26,7 +26,7 @@ pub struct Account {
 impl Account {
     pub fn new(account_hash: Vec<u8>) -> Self {
         Self {
-            balance: 0,
+            credit: 0,
             allowances: LookupMap::new(account_hash),
             allowances_count: 0
         }
@@ -98,7 +98,11 @@ impl ScaleToken {
 
     /// Returns balance of the `owner_id` account.
     pub fn get_balance(&self, owner_id: AccountId) -> U128 {
-        self.get_account(&owner_id).balance.into()
+        self.get_account(&owner_id).credit.into()
+    }
+
+    pub fn get_credit(&self, owner_id: AccountId) -> U128 {
+        self.get_account(&owner_id).credit.into()
     }
 
     #[payable]
@@ -139,10 +143,10 @@ impl ScaleToken {
         env::log(format!("transfer_from {} to {}, {}", owner_id, new_owner_id, amount).as_bytes());
 
         // Checking and updating unlocked balance
-        if account.balance < amount {
+        if account.credit < amount {
             env::panic(b"Not enough balance");
         }
-        account.balance -= amount;
+        account.credit -= amount;
 
         // If transferring by escrow, need to check and update allowance.
         let escrow_account_id = env::predecessor_account_id();
@@ -159,7 +163,7 @@ impl ScaleToken {
 
         // Deposit amount to the new owner and save the new account to the state.
         let mut new_account = self.get_account(&new_owner_id);
-        new_account.balance += amount;
+        new_account.credit += amount;
         self.set_account(&new_owner_id, &new_account);
         self.refund_storage(initial_storage);
     }
@@ -191,9 +195,9 @@ impl ScaleToken {
 
         self.total_supply += amount;
         let mut account = self.get_account(&target);
-        account.balance += amount;
+        account.credit += amount;
         self.set_account(&target, &account);
-        account.balance.into()
+        account.credit.into()
     }
 
     #[allow(dead_code)]
@@ -207,10 +211,10 @@ impl ScaleToken {
         let mut account = self.get_account(&target);
 
         // Checking and updating unlocked balance
-        if account.balance <= amount {
+        if account.credit <= amount {
             env::panic(b"Not enough balance");
         }
-        account.balance -= amount;
+        account.credit -= amount;
 
         // If transferring by escrow, need to check and update allowance.
         if caller != target {
@@ -240,7 +244,7 @@ impl ScaleToken {
 
     fn set_account(&mut self, owner_id: &AccountId, account: &Account) {
         let account_hash = env::sha256(owner_id.as_bytes());
-        if account.balance > 0 || account.allowances_count > 0 {
+        if account.credit > 0 || account.allowances_count > 0 {
             self.accounts.insert(&account_hash, &account);
         } else {
             self.accounts.remove(&account_hash);

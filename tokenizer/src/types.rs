@@ -10,9 +10,14 @@ construct_uint! {
     pub struct U256(4);
 }
 
-const NO_DEPOSIT: u128 = 0;
+// Near supported 1e24
+pub const DECIMAL: u128 = 1_000_000_000_000_000_000_000_000;
 
-const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
+pub const NO_DEPOSIT: u128 = 0;
+
+pub const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
+
+pub const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct WithdrawAccount {
