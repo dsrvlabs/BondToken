@@ -1,0 +1,13 @@
+[package]
+name = "governance"
+version = "0.1.0"
+authors = ["Yoonsung <yoonsung@dsrvlabs.com>"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "2.0.0"
+uint = { version = "0.8.3", default-features = false }
