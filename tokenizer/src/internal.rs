@@ -35,9 +35,9 @@ impl Tokenizer {
 
     /// 모든 검증인으로 부터 비율 맞게 unstake
     fn undelegate(&self, amount: Balance) {
-        let mut total_ratio;
+        let mut total_ratio: Balance;
         for tuple in self.registry.get_validators().iter() {
-            total_ratio += tuple.1;
+            total_ratio += tuple.1.into();
         }
 
         for tuple in self.registry.get_validators().iter() {
