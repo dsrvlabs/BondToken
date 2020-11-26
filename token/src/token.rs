@@ -1,9 +1,7 @@
 use crate::*;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap};
 use near_sdk::json_types::{U128};
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, Promise, StorageUsage
+    env, near_bindgen, AccountId
 };
 
 #[near_bindgen]
@@ -101,7 +99,7 @@ impl ScaleToken {
 
         // Checking and updating unlocked balance
         if account.credit < credit_amount {
-            env::panic(b"Not enough balance");
+            env::panic(format!("Not enough balance {} {} {} {}", account.credit, credit_amount, amount.0, self.scale_factor).as_bytes());
         }
         account.credit -= credit_amount;
 
@@ -144,12 +142,14 @@ impl ScaleToken {
 
     /// Mints given amount to the smart contract caller
     #[allow(dead_code)]
-    pub fn mint_to(&mut self, credit_amount: U128, target: AccountId) -> U128 {
+    pub fn mint_to(&mut self, amount: U128, target: AccountId) -> U128 {
         self.assert_tokenizer();
 
-        self.total_credit += credit_amount.0;
+        let credit = amount.0 * self.scale_factor;
+
+        self.total_credit += credit;
         let mut account = self.get_account(&target);
-        account.credit += credit_amount.0;
+        account.credit += credit;
         self.set_account(&target, &account);
         account.credit.into()
     }

@@ -1,6 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
-use near_sdk::json_types::{U128};
 use near_sdk::{
     env, near_bindgen, AccountId, Balance, Promise, StorageUsage
 };
@@ -60,57 +59,85 @@ impl ScaleToken {
     }
 }
 
-// #[cfg(not(target_arch = "wasm32"))]
-// #[cfg(test)]
-// mod tests {
-//     use near_sdk::MockedBlockchain;
-//     use near_sdk::{testing_env, VMContext};
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests {
+    use near_sdk::MockedBlockchain;
+    use near_sdk::{testing_env, VMContext};
 
-//     use super::*;
+    use super::*;
 
-//     fn tokenizer() -> AccountId {
-//         "tokenizer.near".to_string()
-//     }
-//     fn alice() -> AccountId {
-//         "alice.near".to_string()
-//     }
-//     fn bob() -> AccountId {
-//         "bob.near".to_string()
-//     }
-//     fn carol() -> AccountId {
-//         "carol.near".to_string()
-//     }
+    fn tokenizer() -> AccountId {
+        "tokenizer.near".to_string()
+    }
+    fn alice() -> AccountId {
+        "alice.near".to_string()
+    }
+    fn bob() -> AccountId {
+        "bob.near".to_string()
+    }
+    fn carol() -> AccountId {
+        "carol.near".to_string()
+    }
 
-//     fn get_context(predecessor_account_id: AccountId) -> VMContext {
-//         VMContext {
-//             current_account_id: alice(),
-//             signer_account_id: bob(),
-//             signer_account_pk: vec![0, 1, 2],
-//             predecessor_account_id,
-//             input: vec![],
-//             block_index: 0,
-//             block_timestamp: 0,
-//             account_balance: 1_000_000_000_000_000_000_000_000_000u128,
-//             account_locked_balance: 0,
-//             storage_usage: 10u64.pow(6),
-//             attached_deposit: 0,
-//             prepaid_gas: 10u64.pow(18),
-//             random_seed: vec![0, 1, 2],
-//             is_view: false,
-//             output_data_receivers: vec![],
-//             epoch_height: 0,
-//         }
-//     }
+    fn get_context(predecessor_account_id: AccountId) -> VMContext {
+        VMContext {
+            current_account_id: alice(),
+            signer_account_id: bob(),
+            signer_account_pk: vec![0, 1, 2],
+            predecessor_account_id,
+            input: vec![],
+            block_index: 0,
+            block_timestamp: 0,
+            account_balance: 1_000_000_000_000_000_000_000_000_000u128,
+            account_locked_balance: 0,
+            storage_usage: 10u64.pow(6),
+            attached_deposit: 0,
+            prepaid_gas: 10u64.pow(18),
+            random_seed: vec![0, 1, 2],
+            is_view: false,
+            output_data_receivers: vec![],
+            epoch_height: 0,
+        }
+    }
 
-//     #[test]
-//     fn test_initialize_new_token() {
-//         let context = get_context(carol());
-//         testing_env!(context);
-//         let total_supply = 0u128;
-//         let contract = ScaleToken::new(tokenizer());
-//         assert_eq!(contract.get_total_supply().0, total_supply);
-//         assert_eq!(contract.get_balance(tokenizer()).0, total_supply);
-//     }
+    #[test]
+    fn test_initialize_new_token() {
+        let context = get_context(carol());
+        testing_env!(context);
+        let total_supply = 0u128;
+        let contract = ScaleToken::new(tokenizer());
+        assert_eq!(contract.get_total_supply().0, total_supply);
+        assert_eq!(contract.get_balance(tokenizer()).0, total_supply);
+    }
+
+    #[test]
+    fn test_transfer_to_a_different_account_works() {
+        let mut context = get_context(tokenizer());
+        testing_env!(context.clone());
+        let mint_balance = 1_000_000_000_000_000u128;
+        let mut contract = ScaleToken::new(tokenizer());
+        contract.mint_to(mint_balance.into(), carol());
+
+        context.predecessor_account_id = carol();
+        context.storage_usage = env::storage_usage();
+        context.attached_deposit = 1000 * STORAGE_PRICE_PER_BYTE;
+        testing_env!(context.clone());
+        let transfer_amount = mint_balance / 3;
+        contract.transfer(bob(), transfer_amount.into());
+        context.storage_usage = env::storage_usage();
+        context.account_balance = env::account_balance();
+
+        context.is_view = true;
+        context.attached_deposit = 0;
+        testing_env!(context.clone());
+        assert_eq!(
+            contract.get_balance(carol()).0,
+            (mint_balance - transfer_amount)
+        );
+        assert_eq!(contract.get_balance(bob()).0, transfer_amount);
+    }
+}
 
 //     // #[test]
 //     // #[should_panic]

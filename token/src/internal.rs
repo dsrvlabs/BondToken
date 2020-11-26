@@ -1,5 +1,5 @@
 use crate::*;
-use near_sdk::{near_bindgen, AccountId, Balance};
+use near_sdk::{AccountId, Balance};
 
 /********************/
 /* Internal methods */
