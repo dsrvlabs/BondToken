@@ -86,7 +86,7 @@ impl ScaleToken {
         if amount.0 == 0 {
             env::panic(b"Can't transfer 0 tokens");
         }
-        let credit_amount = amount.0 * self.scale_factor;
+        let credit_amount = amount.0 / self.scale_factor;
 
         assert_ne!(
             owner_id, new_owner_id,
@@ -142,41 +142,46 @@ impl ScaleToken {
 
     /// Mints given amount to the smart contract caller
     #[allow(dead_code)]
-    pub fn mint_to(&mut self, amount: U128, target: AccountId) -> U128 {
+    pub fn mint_to(&mut self, amount: Balance, target: AccountId) {
         self.assert_tokenizer();
 
-        let credit = amount.0 * self.scale_factor;
-
-        self.total_credit += credit;
         let mut account = self.get_account(&target);
-        account.credit += credit;
+        let credit_amount = amount * self.scale_factor;
+
+        self.total_credit += credit_amount;
+        account.credit += credit_amount;
+
+        env::log(format!("transfer_from {} to {}, {}", "0", target, amount).as_bytes());
+
         self.set_account(&target, &account);
-        account.credit.into()
     }
 
     #[allow(dead_code)]
-    pub fn burn_from(&mut self, credit_amount: U128, target: AccountId) {
+    pub fn burn_from(&mut self, amount: Balance, target: AccountId) {
         self.assert_tokenizer();
 
         // Retrieving the account from the state.
         let mut account = self.get_account(&target);
+        let credit_amount = amount * self.scale_factor;
 
         // Checking and updating unlocked balance
-        if account.credit <= credit_amount.0 {
+        if account.credit <= credit_amount {
             env::panic(b"Not enough balance");
         }
-        account.credit -= credit_amount.0;
+        account.credit -= credit_amount;
 
         // If transferring by escrow, need to check and update allowance.
         if env::predecessor_account_id() != target {
             let allowance = account.get_allowance(&env::predecessor_account_id());
-            if allowance < credit_amount.0 {
+            if allowance < amount {
                 env::panic(b"Not enough allowance");
             }
-            account.set_allowance(&env::predecessor_account_id(), allowance - credit_amount.0);
+            account.set_allowance(&env::predecessor_account_id(), allowance - amount);
         }
 
-        self.total_credit -= credit_amount.0;
+        env::log(format!("transfer_from {} to {}, {}", target, "0", amount).as_bytes());
+
+        self.total_credit -= credit_amount;
         self.set_account(&target, &account);
     }
 }
