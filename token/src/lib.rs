@@ -1,15 +1,18 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
+use near_sdk::json_types::{U128};
 use near_sdk::{
     env, near_bindgen, AccountId, Balance, Promise, StorageUsage
 };
 
 pub use crate::token::*;
 pub use crate::account::*;
+pub use crate::math::*;
 pub use crate::internal::*;
 
 pub mod token;
 pub mod account;
+pub mod math;
 pub mod internal;
 
 #[global_allocator]
@@ -34,7 +37,7 @@ pub struct ScaleToken {
     pub tokenizer: AccountId,
 
     /// default 
-    pub scale_factor: Balance,
+    pub scale_factor: U128,
 }
 
 impl Default for ScaleToken {

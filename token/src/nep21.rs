@@ -7,5 +7,7 @@ pub trait NEP21 {
 
     fn transfer_from(&mut self, from: AccountId, dest: AccountId, amount: U128);
 
-    fn mint_to(&mut self, amount: U128, target: AccountId) -> U128;
+    fn mint_to(&mut self, amount: U128, target: AccountId);
+
+    fn burn_from(&mut self, amount: Balance, target: AccountId);
 }

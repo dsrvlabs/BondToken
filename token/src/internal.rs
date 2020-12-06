@@ -27,7 +27,7 @@ impl ScaleToken {
 
     pub(crate) fn set_account(&mut self, owner_id: &AccountId, account: &Account) {
         let account_hash = env::sha256(owner_id.as_bytes());
-        if account.credit > 0 || account.allowances_count > 0 {
+        if account.credit.0 > 0 || account.allowances_count > 0 {
             self.accounts.insert(&account_hash, &account);
         } else {
             self.accounts.remove(&account_hash);

@@ -35,18 +35,18 @@ impl Tokenizer {
 
     /// 모든 검증인으로 부터 비율 맞게 unstake
     fn undelegate(&self, amount: Balance) {
-        let mut total_ratio: Balance;
+        let mut total_ratio = 0u32;
         for tuple in self.registry.get_validators().iter() {
-            total_ratio += tuple.1.into();
+            total_ratio += tuple.1;
         }
 
         for tuple in self.registry.get_validators().iter() {
-            let bal = amount * (tuple.1.into() / total_ratio.into());
-            ext_validator::unstake(bal, &tuple.0, NO_DEPOSIT, SINGLE_CALL_GAS);
+            let bal: u128 = amount * (u128::from(tuple.1) / u128::from(total_ratio));
+            ext_validator::unstake(U128::from(bal), &tuple.0, NO_DEPOSIT, SINGLE_CALL_GAS);
             env::log(
                 format!(
                     "unstake amount @{} from validator @{}",
-                    bal.into(),
+                    bal,
                     tuple.0
                 )
                 .as_bytes()

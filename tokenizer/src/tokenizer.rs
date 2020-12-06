@@ -4,7 +4,7 @@ use near_sdk::{near_bindgen, AccountId, Promise, PublicKey, Balance};
 #[near_bindgen]
 impl Tokenizer {
     #[payable]
-    pub fn mint(&self) {
+    pub fn deposit(&self) {
         let owner_id = env::predecessor_account_id();
         let deposit = env::attached_deposit();
 

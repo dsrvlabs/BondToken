@@ -1,5 +1,6 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
+use near_sdk::json_types::{U128};
 use near_sdk::{
     env, AccountId, Balance
 };
@@ -7,7 +8,7 @@ use near_sdk::{
 /// Contains balance and allowances information for one account.
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Account {
-    pub credit: Balance,
+    pub credit: U128,
     pub allowances: LookupMap<Vec<u8>, Balance>,
     pub allowances_count: u32,
 }
@@ -15,7 +16,7 @@ pub struct Account {
 impl Account {
     pub fn new(account_hash: Vec<u8>) -> Self {
         Self {
-            credit: 0,
+            credit: U128::from(0),
             allowances: LookupMap::new(account_hash),
             allowances_count: 0
         }

@@ -30,7 +30,7 @@
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
+	"forwardPorts": [3030, 4000, 5000],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "mkdir -p /root/.ssh && cp -r /root/.ssh-localhost/* /root/.ssh && chmod 700 /root/.ssh && chmod 600 /root/.ssh/* && rustup toolchain install nightly && rustup target add wasm32-unknown-unknown --toolchain nightly && echo \"export PATH=/root/.nearup:${PATH}\nexport NODE_ENV=local\" >> ~/.zshrc",

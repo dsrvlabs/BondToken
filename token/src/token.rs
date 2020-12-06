@@ -12,12 +12,12 @@ impl ScaleToken {
 
     /// Returns total supply of tokens.
     pub fn get_total_supply(&self) -> U128 {
-        ((self.total_credit / self.scale_factor) * 10u128.pow(24)).into()
+        ScaleToken::devide_scale(U128::from(self.total_credit), self.scale_factor)
     }
 
     /// Returns balance of the `owner_id` account.
     pub fn get_balance(&self, owner_id: AccountId) -> U128 {
-        ((self.get_account(&owner_id).credit / self.scale_factor) * 10u128.pow(24)).into()
+        ScaleToken::devide_scale(self.get_account(&owner_id).credit, self.scale_factor)
     }
 
     pub fn get_credit(&self, owner_id: AccountId) -> U128 {
@@ -86,7 +86,7 @@ impl ScaleToken {
         if amount.0 == 0 {
             env::panic(b"Can't transfer 0 tokens");
         }
-        let credit_amount = amount.0 / self.scale_factor;
+        let credit_amount = ScaleToken::devide_scale(U128::from(amount), self.scale_factor);
 
         assert_ne!(
             owner_id, new_owner_id,
@@ -98,10 +98,10 @@ impl ScaleToken {
         env::log(format!("transfer_from {} to {}, {}", owner_id, new_owner_id, amount.0).as_bytes());
 
         // Checking and updating unlocked balance
-        if account.credit < credit_amount {
-            env::panic(format!("Not enough balance {} {} {} {}", account.credit, credit_amount, amount.0, self.scale_factor).as_bytes());
+        if account.credit.0 < credit_amount.0 {
+            env::panic(format!("Not enough balance {} {} {} {}", account.credit.0, credit_amount.0, amount.0, self.scale_factor.0).as_bytes());
         }
-        account.credit -= credit_amount;
+        account.credit.0 -= credit_amount.0;
 
         // If transferring by escrow, need to check and update allowance.
         let escrow_account_id = env::predecessor_account_id();
@@ -118,7 +118,7 @@ impl ScaleToken {
 
         // Deposit amount to the new owner and save the new account to the state.
         let mut new_account = self.get_account(&new_owner_id);
-        new_account.credit += credit_amount;
+        new_account.credit.0 += credit_amount.0;
         self.set_account(&new_owner_id, &new_account);
         self.refund_storage(initial_storage);
     }
@@ -146,10 +146,10 @@ impl ScaleToken {
         self.assert_tokenizer();
 
         let mut account = self.get_account(&target);
-        let credit_amount = amount * self.scale_factor;
+        let credit_amount = ScaleToken::multiply_scale(U128::from(amount), self.scale_factor);
 
-        self.total_credit += credit_amount;
-        account.credit += credit_amount;
+        self.total_credit += credit_amount.0;
+        account.credit.0 += credit_amount.0;
 
         env::log(format!("transfer_from {} to {}, {}", "0", target, amount).as_bytes());
 
@@ -162,13 +162,13 @@ impl ScaleToken {
 
         // Retrieving the account from the state.
         let mut account = self.get_account(&target);
-        let credit_amount = amount * self.scale_factor;
+        let credit_amount = ScaleToken::multiply_scale(U128::from(amount), self.scale_factor);
 
         // Checking and updating unlocked balance
-        if account.credit <= credit_amount {
+        if account.credit.0 <= credit_amount.0 {
             env::panic(b"Not enough balance");
         }
-        account.credit -= credit_amount;
+        account.credit.0 -= credit_amount.0;
 
         // If transferring by escrow, need to check and update allowance.
         if env::predecessor_account_id() != target {
@@ -181,7 +181,7 @@ impl ScaleToken {
 
         env::log(format!("transfer_from {} to {}, {}", target, "0", amount).as_bytes());
 
-        self.total_credit -= credit_amount;
+        self.total_credit -= credit_amount.0;
         self.set_account(&target, &account);
     }
 }
