@@ -1,262 +1,173 @@
+use near_sdk::ext_contract;
+use near_sdk::collections::{LookupMap};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, Vector};
-use near_sdk::json_types::{U128};
+use near_sdk::json_types::U128;
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, Promise, StorageUsage
+    env, near_bindgen, AccountId, Balance
 };
 
-const TOKENIZER: &[u8] = b"TOKENIZER";
-const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+pub use crate::registry::{Registry};
+pub use crate::types::*;
+pub use crate::internal::*;
+
+pub mod registry;
+pub mod types;
+pub mod internal;
+
+#[global_allocator]
+static ALLOC: near_sdk::wee_alloc::WeeAlloc<'_> = near_sdk::wee_alloc::WeeAlloc::INIT;
+
+#[ext_contract(ext_validator)]
+pub trait ExtValidator {
+    /// Deposits the attached amount into the inner account of the predecessor.
+    // #[payable]
+    fn deposit(&mut self);
+
+    /// Deposits the attached amount into the inner account of the predecessor and stakes it.
+    // #[payable]
+    fn deposit_and_stake(&mut self);
+
+    /// Withdraws the entire unstaked balance from the predecessor account.
+    /// It's only allowed if the `unstake` action was not performed in the four most recent epochs.
+    fn withdraw_all(&mut self);
+
+    /// Withdraws the non staked balance for given account.
+    /// It's only allowed if the `unstake` action was not performed in the four most recent epochs.
+    fn withdraw(&mut self, amount: U128);
+
+    /// Stakes all available unstaked balance from the inner account of the predecessor.
+    fn stake_all(&mut self);
+
+    /// Stakes the given amount from the inner account of the predecessor.
+    /// The inner account should have enough unstaked balance.
+    fn stake(&mut self, amount: U128);
+
+    /// Unstakes all staked balance from the inner account of the predecessor.
+    /// The new total unstaked balance will be available for withdrawal in four epochs.
+    fn unstake_all(&mut self);
+
+    /// Unstakes the given amount from the inner account of the predecessor.
+    /// The inner account should have enough staked balance.
+    /// The new total unstaked balance will be available for withdrawal in four epochs.
+    fn unstake(&mut self, amount: U128);
+}
+
+#[ext_contract(ext_ft)]
+pub trait ExtFT {
+    fn transfer(&mut self, dest: AccountId, amount: U128);
+
+    fn transfer_from(&mut self, from: AccountId, dest: AccountId, amount: U128);
+
+    fn mint_to(&mut self, amount: u128, target: AccountId) -> U128;
+    
+    fn burn_from(&mut self, amount: u128, target: AccountId);
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Tokenizer {
+    token: AccountId,
+    /// for withdraws
+    /// sha256(AccountId) -> Withdrawer Detail
+    withdraws: LookupMap<Vec<u8>, WithdrawAccount>,
     governance: AccountId,
-    registry: Vector<Registry>,
+    registry: Registry,
+    total_waiting: Balance
 }
 
+impl Default for Tokenizer {
+    fn default() -> Self {
+        panic!("Tokenizer should be initialized before usage")
+    }
+}
+
+#[near_bindgen]
 impl Tokenizer {
-    pub fn new(governor: AccountId) -> Self {
-        let index_key_id = append(&TOKENIZER, b'l');
+    #[init]
+    pub fn new(governance: AccountId) -> Self {
+        assert!(!env::state_exists(), "Registry: Already initialized");
         Self {
-            governance: governor,
-            registry: Vector::new(index_key_id)
+            token: "".to_string(),
+            withdraws: LookupMap::new(b"a".to_vec()),
+            governance,
+            registry: Registry::new(),
+            total_waiting: 0
         }
     }
-
-    pub fn add_registry(&mut self, validator: AccountId, ratio: u32) {
-        self.registry.push(&Registry::new(validator, ratio))
-    }
 }
 
-// /// Price per 1 byte of storage from mainnet genesis config.
+
+// use token::{nep21};
+// use registry::{registry};
+// use token::ScaleToken;
+// pub mod utils;
+// mod validator;
+
+
+// const DEPOSIT_AND_STAKING_GAS: u64 = 100_000_000_000_000;
 // const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+// const SINGLE_CALL_GAS: u64 = 200_000_000_000_000;
 
-// /// Contains balance and allowances information for one account.
-// #[derive(BorshDeserialize, BorshSerialize)]
-// pub struct Account {
-//     pub balance: Balance,
-//     pub allowances: LookupMap<Vec<u8>, Balance>,
-//     pub allowances_count: u32,
-// }
 
-// impl Account {
-//     pub fn new(account_hash: Vec<u8>) -> Self {
-//         Self {
-//             balance: 0,
-//             allowances: LookupMap::new(account_hash),
-//             allowances_count: 0
-//         }
-//     }
 
-//     pub fn set_allowance(&mut self, escrow_account_id: &AccountId, allowance: Balance) {
-//         let escrow_hash = env::sha256(escrow_account_id.as_bytes());
-//         if allowance > 0 {
-//             if self.allowances.insert(&escrow_hash, &allowance).is_none() {
-//                 self.allowances_count += 1;
-//             }
-//         } else {
-//             if self.allowances.remove(&escrow_hash).is_some() {
-//                 self.allowances_count -= 1;
-//             }
-//         }
-//     }
-
-//     pub fn get_allowance(&self, escrow_account_id: &AccountId) -> Balance {
-//         let escrow_hash = env::sha256(escrow_account_id.as_bytes());
-//         self.allowances.get(&escrow_hash).unwrap_or(0)
-//     }
-// }
 
 // #[near_bindgen]
-// #[derive(BorshDeserialize, BorshSerialize)]
-// pub struct ScaleToken {
-//     /// sha256(AccountID) -> Account details.
-//     pub accounts: LookupMap<Vec<u8>, Account>,
+// impl Tokenizer {
 
-//     /// Total credit of the all token.
-//     pub total_credit: Balance,
-
-//     /// 토큰이 제공하는 소수점자리 18u8
-//     pub decimals: u8,
-
-//     /// Tokenizer
-//     pub tokenizer: AccountId,
-// }
-
-// impl Default for ScaleToken {
-//     fn default() -> Self {
-//         panic!("Fun token should be initialized before usage")
-//     }
-// }
-
-// #[near_bindgen]
-// impl ScaleToken {
-//     /// Initializes the contract with the given total supply owned by the given `owner_id`.
 //     #[init]
-//     pub fn new(tokenizer_id: AccountId) -> Self {
-//         assert!(!env::state_exists(), "Already initialized");
-//         let st = Self {
-//             accounts: LookupMap::new(b"a".to_vec()),
-//             total_credit: 0u128,
-//             decimals: 18u8,
-//             tokenizer: tokenizer_id
-//         };
-//         st
-//     }
-
-//     pub fn decimals(&self) -> u8 {
-//         return self.decimals;
-//     }
-
-//     /// Returns total supply of tokens.
-//     pub fn get_total_supply(&self) -> U128 {
-//         self.total_credit.into()
-//     }
-
-//     /// Returns balance of the `owner_id` account.
-//     pub fn get_balance(&self, owner_id: AccountId) -> U128 {
-//         self.get_account(&owner_id).balance.into()
-//     }
-
-//     #[payable]
-//     pub fn approve(&mut self, escrow_account_id: AccountId, amount: U128) {
-//         let initial_storage = env::storage_usage();
-//         assert!(
-//             env::is_valid_account_id(escrow_account_id.as_bytes()),
-//             "Escrow account ID is invalid"
-//         );
-//         let owner_id = env::predecessor_account_id();
-//         if escrow_account_id == owner_id {
-//             env::panic(b"Can not increment allowance for yourself");
+//     pub fn new(governance: AccountId, registry: AccountId) -> Self {
+//         assert!(!env::state_exists(), "Registry: Already initialized");
+//         Self {
+//             token: "".to_string(),
+//             governance,
+//             registry: Registry::new()
 //         }
-//         let mut account = self.get_account(&owner_id);
-//         account.set_allowance(&escrow_account_id, amount.into());
-//         self.set_account(&owner_id, &account);
-//         self.refund_storage(initial_storage);
 //     }
 
-//     #[payable]
-//     pub fn transfer_from(&mut self, owner_id: AccountId, new_owner_id: AccountId, amount: U128) {
-//         let initial_storage = env::storage_usage();
-//         assert!(
-//             env::is_valid_account_id(new_owner_id.as_bytes()),
-//             "New owner's account ID is invalid"
-//         );
-//         let amount = amount.into();
-//         if amount == 0 {
-//             env::panic(b"Can't transfer 0 tokens");
-//         }
-//         assert_ne!(
-//             owner_id, new_owner_id,
-//             "The new owner should be different from the current owner"
-//         );
-//         // Retrieving the account from the state.
-//         let mut account = self.get_account(&owner_id);
-
-//         env::log(format!("transfer_from {} to {}, {}", owner_id, new_owner_id, amount).as_bytes());
-
-//         // Checking and updating unlocked balance
-//         if account.balance < amount {
-//             env::panic(b"Not enough balance");
-//         }
-//         account.balance -= amount;
-
-//         // If transferring by escrow, need to check and update allowance.
-//         let escrow_account_id = env::predecessor_account_id();
-//         if escrow_account_id != owner_id {
-//             let allowance = account.get_allowance(&escrow_account_id);
-//             if allowance < amount {
-//                 env::panic(b"Not enough allowance");
-//             }
-//             account.set_allowance(&escrow_account_id, allowance - amount);
-//         }
-
-//         // Saving the account back to the state.
-//         self.set_account(&owner_id, &account);
-
-//         // Deposit amount to the new owner and save the new account to the state.
-//         let mut new_account = self.get_account(&new_owner_id);
-//         new_account.balance += amount;
-//         self.set_account(&new_owner_id, &new_account);
-//         self.refund_storage(initial_storage);
-//     }
-
-//     #[payable]
-//     pub fn transfer(&mut self, new_owner_id: AccountId, amount: U128) {
-//         // NOTE: New owner's Account ID checked in transfer_from.
-//         // Storage fees are also refunded in transfer_from.
-//         self.transfer_from(env::predecessor_account_id(), new_owner_id, amount);
-//     }
-
-//     pub fn get_allowance(&self, owner_id: AccountId, escrow_account_id: AccountId) -> U128 {
-//         assert!(
-//             env::is_valid_account_id(escrow_account_id.as_bytes()),
-//             "Escrow account ID is invalid"
-//         );
-//         self.get_account(&owner_id)
-//             .get_allowance(&escrow_account_id)
-//             .into()
-//     }
-
-//     /// Mints given amount to the smart contract caller
-//     fn mint_to(&mut self, amount: u128, target: AccountId) -> U128 {
+//     pub fn set_token(&mut self, token: AccountId) {
 //         let caller = env::predecessor_account_id();
-//         if caller != self.tokenizer {
-//             env::panic(b"Caller is not Tokenizer");
+//         if caller != self.governance {
+//             env::panic(b"Caller is not Governance");
 //         }
-
-//         self.total_credit += amount;
-//         let mut account = self.get_account(&target);
-//         account.balance += amount;
-//         self.set_account(&target, &account);
-//         account.balance.into()
+//         self.token = token;
 //     }
-// }
 
-// impl ScaleToken {
-//     fn get_account(&self, owner_id: &AccountId) -> Account {
-//         assert!(
-//             env::is_valid_account_id(owner_id.as_bytes()),
-//             "Owner's account ID is invalid"
+//     pub fn deposit(&self) {
+//         let owner_id = env::predecessor_account_id();
+//         let deposit = env::attached_deposit();
+
+//         let receipt = env::promise_create(
+//             self.registry.clone(),
+//             b"get_validators",
+//             &[],
+//             0,
+//             SINGLE_CALL_GAS,
 //         );
-//         let account_hash = env::sha256(owner_id.as_bytes());
-//         self.accounts
-//             .get(&account_hash)
-//             .unwrap_or_else(|| Account::new(account_hash))
-//     }
 
-//     fn set_account(&mut self, owner_id: &AccountId, account: &Account) {
-//         let account_hash = env::sha256(owner_id.as_bytes());
-//         if account.balance > 0 || account.allowances_count > 0 {
-//             self.accounts.insert(&account_hash, &account);
-//         } else {
-//             self.accounts.remove(&account_hash);
-//         }
-//     }
-
-//     fn refund_storage(&self, initial_storage: StorageUsage) {
-//         let current_storage = env::storage_usage();
-//         let attached_deposit = env::attached_deposit();
-//         let refund_amount = if current_storage > initial_storage {
-//             let required_deposit =
-//                 Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
-//             assert!(
-//                 required_deposit <= attached_deposit,
-//                 "The required attached deposit is {}, but the given attached deposit is is {}",
-//                 required_deposit,
-//                 attached_deposit,
-//             );
-//             attached_deposit - required_deposit
-//         } else {
-//             attached_deposit
-//                 + Balance::from(initial_storage - current_storage) * STORAGE_PRICE_PER_BYTE
+//         let validators_bytes = match env::promise_result(receipt) {
+//             PromiseResult::Successful(x) => x,
+//             PromiseResult::Failed => env::panic(b"The promise failed. See receipt failures."),
+//             PromiseResult::NotReady => env::panic(b"The promise was not ready."),
 //         };
-//         if refund_amount > 0 {
-//             env::log(format!("Refunding {} tokens for storage", refund_amount).as_bytes());
-//             Promise::new(env::predecessor_account_id()).transfer(refund_amount);
+
+//         let validator_info = Vec<>::From(&validators_bytes);
+
+//         for (validator, ratio) in validator_info {
+//             let amount = (deposit / 10000) * ratio;
+//             println!("{:?}, {:?}", validator, amount);
+//             // validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
 //         }
 //     }
+
+//     // fn deposit_and_stake(&mut self, validator: AccountId, amount: Balance) {
+//     //     validator::ext_validator::deposit_and_stake(&validator, amount, DEPOSIT_AND_STAKING_GAS);
+//     //     env::log(format!("{} to staking amount {}", validator, amount).as_bytes());
+//     // }
+
+//     // #[result_serializer(borsh)]
+//     // fn validators(&self) -> Promise {
+//     //     registry::ext_registry::get_validators(&self.registry, 0, DEPOSIT_AND_STAKING_GAS)
+//     // }
 // }
 
 // #[cfg(not(target_arch = "wasm32"))]
@@ -267,23 +178,33 @@ impl Tokenizer {
 
 //     use super::*;
 
-//     fn tokenizer() -> AccountId {
-//         "tokenizer.near".to_string()
+//     /// Governance Account
+//     fn governance() -> AccountId {
+//         "governance.near".to_string()
 //     }
+
+//     fn deployer() -> AccountId {
+//         "deployer.near".to_string()
+//     }
+
+//     // start Validator List
 //     fn alice() -> AccountId {
 //         "alice.near".to_string()
 //     }
-//     fn bob() -> AccountId {
-//         "bob.near".to_string()
-//     }
-//     fn carol() -> AccountId {
-//         "carol.near".to_string()
-//     }
+
+//     // fn bob() -> AccountId {
+//     //     "bob.near".to_string()
+//     // }
+
+//     // fn carol() -> AccountId {
+//     //     "carol.near".to_string()
+//     // }
+//     // end of Validator List
 
 //     fn get_context(predecessor_account_id: AccountId) -> VMContext {
 //         VMContext {
-//             current_account_id: alice(),
-//             signer_account_id: bob(),
+//             current_account_id: governance(),
+//             signer_account_id: governance(),
 //             signer_account_pk: vec![0, 1, 2],
 //             predecessor_account_id,
 //             input: vec![],
@@ -301,295 +222,156 @@ impl Tokenizer {
 //         }
 //     }
 
-//     #[test]
-//     fn test_initialize_new_token() {
-//         let context = get_context(carol());
-//         testing_env!(context);
-//         let total_supply = 0u128;
-//         let contract = ScaleToken::new(tokenizer());
-//         assert_eq!(contract.get_total_supply().0, total_supply);
-//         assert_eq!(contract.get_balance(tokenizer()).0, total_supply);
-//     }
+//     // #[test]
+//     // fn test_intialize_new_tokenizer() {
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let registry = Registry::new(governance());
+//     //     let tokenizer = Tokenizer::new(governance(), registry);
+//     // }
 
 //     // #[test]
-//     // #[should_panic]
-//     // fn test_initialize_new_token_twice_fails() {
-//     //     let context = get_context(carol());
+//     // fn test_initialize_new_registry() {
+//     //     let context = get_context(deployer());
 //     //     testing_env!(context);
-//     //     {
-//     //         let _contract = ScaleToken::new(tokenizer());
-//     //     }
-//     //     ScaleToken::new(tokenizer());
-//     // }
-
-//     #[test]
-//     fn test_transfer_to_a_different_account_works() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
-
-//         context.predecessor_account_id = carol();
-//         context.storage_usage = env::storage_usage();
-//         context.attached_deposit = 1000 * STORAGE_PRICE_PER_BYTE;
-//         testing_env!(context.clone());
-//         let transfer_amount = mint_balance / 3;
-//         contract.transfer(bob(), transfer_amount.into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
-
-//         context.is_view = true;
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         assert_eq!(
-//             contract.get_balance(carol()).0,
-//             (mint_balance - transfer_amount)
-//         );
-//         assert_eq!(contract.get_balance(bob()).0, transfer_amount);
-//     }
-
-//     #[test]
-//     #[should_panic(expected = "The new owner should be different from the current owner")]
-//     fn test_transfer_to_self_fails() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
-
-//         context.predecessor_account_id = carol();
-//         context.storage_usage = env::storage_usage();
-//         context.attached_deposit = 1000 * STORAGE_PRICE_PER_BYTE;
-//         testing_env!(context.clone());
-//         let transfer_amount = mint_balance / 3;
-//         contract.transfer(carol(), transfer_amount.into());
-//     }
-
-//     #[test]
-//     #[should_panic(expected = "Can not increment allowance for yourself")]
-//     fn test_increment_allowance_to_self_fails() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
-
-//         context.predecessor_account_id = carol();
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         testing_env!(context.clone());
-//         contract.approve(carol(), (mint_balance / 2).into());
-//     }
-
-//     // #[test]
-//     // #[should_panic(expected = "Can not decrement allowance for yourself")]
-//     // fn test_decrement_allowance_to_self_fails() {
-//     //     let mut context = get_context(tokenizer());
-//     //     testing_env!(context.clone());
-//     //     let mint_balance = 1_000_000_000_000_000u128;
-//     //     let mut contract = ScaleToken::new(tokenizer());
-//     //     contract.mint_to(mint_balance, carol());
-
-//     //     context.predecessor_account_id = carol();
-//     //     context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//     //     testing_env!(context.clone());
-//     //     contract.approve(carol(), (mint_balance / 2).into());
+//     //     let contract = Registry::new(governance());
+//     //     assert_eq!(contract.validator_count, 0);
 //     // }
 
 //     // #[test]
-//     // fn test_decrement_allowance_after_allowance_was_saturated() {
-//     //     let mut context = get_context(tokenizer());
-//     //     testing_env!(context.clone());
-//     //     let mint_balance = 1_000_000_000_000_000u128;
-//     //     let mut contract = ScaleToken::new(tokenizer());
-//     //     contract.mint_to(mint_balance, carol());
+//     // fn test_add_validator_with_get_ratio() {
+//     //     let _ratio: u32 = 10;
 
-//     //     context.predecessor_account_id = carol();
-//     //     context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
+//     //     let mut context = get_context(deployer());
 //     //     testing_env!(context.clone());
-//     //     contract.approve(bob(), (mint_balance / 2).into());
-//     //     assert_eq!(contract.get_allowance(carol(), bob()), 0.into())
+
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.add_validator(alice(), _ratio);
+
+//     //     assert_eq!(contract.validator_count, 1);
+//     //     assert_eq!(contract.get_validator_ratio(alice()), Some(_ratio));
 //     // }
 
 //     // #[test]
-//     // fn test_increment_allowance_does_not_overflow() {
-//     //     let mut context = get_context(tokenizer());
-//     //     testing_env!(context.clone());
-//     //     let mint_balance = 1_000_000_000_000_000u128;
-//     //     let mut contract = ScaleToken::new(tokenizer());
-//     //     contract.mint_to(mint_balance, carol());
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_add_validator_with_non_governance_call() {
+//     //     let _ratio: u32 = 10;
 
-//     //     context.predecessor_account_id = carol();
-//     //     context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//     //     testing_env!(context.clone());
-//     //     contract.approve(bob(), (mint_balance * 2).into());
-//     //     assert_eq!(
-//     //         contract.get_allowance(carol(), bob()),
-//     //         std::u128::MAX.into()
-//     //     )
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context);
+
+//     //     let mut contract = Registry::new(governance());
+//     //     contract.add_validator(alice(), _ratio);
 //     // }
 
-//     #[test]
-//     #[should_panic(
-//         expected = "The required attached deposit is 12400000000000000000000, but the given attached deposit is is 0"
-//     )]
-//     fn test_increment_allowance_with_insufficient_attached_deposit() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
+//     // #[test]
+//     // fn test_add_validator_with_get_all_validators() {
+//     //     let _ratio: u32 = 10;
 
-//         context.predecessor_account_id = carol();
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         contract.approve(bob(), (mint_balance / 2).into());
-//     }
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//     #[test]
-//     fn test_carol_escrows_to_bob_transfers_to_alice() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.add_validator(alice(), _ratio);
+//     //     assert_eq!(contract.validator_count, 1);
+//     //     assert_eq!(contract.get_validators(), vec![(alice(), _ratio)]);
+//     // }
 
-//         context.predecessor_account_id = carol();
-//         context.storage_usage = env::storage_usage();
+//     // #[test]
+//     // fn test_del_validator() {
+//     //     let _ratio: u32 = 10;
 
-//         context.is_view = true;
-//         testing_env!(context.clone());
-//         assert_eq!(contract.get_total_supply().0, mint_balance);
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//         let allowance = mint_balance / 3;
-//         let transfer_amount = allowance / 3;
-//         context.is_view = false;
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         testing_env!(context.clone());
-//         contract.approve(bob(), allowance.into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
 
-//         context.is_view = true;
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         assert_eq!(contract.get_allowance(carol(), bob()).0, allowance);
+//     //     contract.add_validator(alice(), _ratio);
+//     //     contract.del_validator(alice());
+//     //     assert_eq!(contract.validator_count, 0);
+//     //     assert_eq!(contract.get_validators(), vec![]);
+//     // }
 
-//         // Acting as bob now
-//         context.is_view = false;
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         context.predecessor_account_id = bob();
-//         testing_env!(context.clone());
-//         contract.transfer_from(carol(), alice(), transfer_amount.into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_del_validator_with_non_governance_call() {
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context);
 
-//         context.is_view = true;
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         assert_eq!(
-//             contract.get_balance(carol()).0,
-//             mint_balance - transfer_amount
-//         );
-//         assert_eq!(contract.get_balance(alice()).0, transfer_amount);
-//         assert_eq!(
-//             contract.get_allowance(carol(), bob()).0,
-//             allowance - transfer_amount
-//         );
-//     }
+//     //     let mut contract = Registry::new(governance());
+//     //     contract.del_validator(alice());
+//     // }
 
-//     #[test]
-//     fn test_carol_escrows_to_bob_locks_and_transfers_to_alice() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Non-exist Validator")]
+//     // fn test_del_validator_with_non_registred_validators() {
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//         context.predecessor_account_id = carol();
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
+//     //     contract.del_validator(alice());
+//     // }
 
-//         context.storage_usage = env::storage_usage();
+//     // #[test]
+//     // fn test_update_validator() {
+//     //     let _ratio = 10u32;
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//         context.is_view = true;
-//         testing_env!(context.clone());
-//         assert_eq!(contract.get_total_supply().0, mint_balance);
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
 
-//         let allowance = mint_balance / 3;
-//         let transfer_amount = allowance / 3;
-//         context.is_view = false;
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         testing_env!(context.clone());
-//         contract.approve(bob(), allowance.into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
+//     //     contract.add_validator(alice(), _ratio);
+//     //     contract.update_validator(alice(), _ratio + 11u32);
 
-//         context.is_view = true;
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         assert_eq!(contract.get_allowance(carol(), bob()).0, allowance);
-//         assert_eq!(contract.get_balance(carol()).0, mint_balance);
+//     //     assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+//     // }
 
-//         // Acting as bob now
-//         context.is_view = false;
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         context.predecessor_account_id = bob();
-//         testing_env!(context.clone());
-//         contract.transfer_from(carol(), alice(), transfer_amount.into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Caller is not Governance")]
+//     // fn test_update_validator_with_non_governance_call() {
+//     //     let _ratio = 10u32;
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//         context.is_view = true;
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         assert_eq!(
-//             contract.get_balance(carol()).0,
-//             (mint_balance - transfer_amount)
-//         );
-//         assert_eq!(contract.get_balance(alice()).0, transfer_amount);
-//         assert_eq!(
-//             contract.get_allowance(carol(), bob()).0,
-//             allowance - transfer_amount
-//         );
-//     }
+//     //     let mut contract = Registry::new(governance());
+//     //     testing_env!(context.clone());
 
-//     #[test]
-//     fn test_self_allowance_set_for_refund() {
-//         let mut context = get_context(tokenizer());
-//         testing_env!(context.clone());
-//         let mint_balance = 1_000_000_000_000_000u128;
-//         let mut contract = ScaleToken::new(tokenizer());
-//         contract.mint_to(mint_balance, carol());
+//     //     contract.update_validator(alice(), _ratio + 11u32);
+//     // }
 
-//         context.predecessor_account_id = carol();
-//         context.storage_usage = env::storage_usage();
+//     // #[test]
+//     // #[should_panic(expected = "Registry: Non-exist Validator")]
+//     // fn test_update_validator_with_non_exist_validator() {
+//     //     let _ratio = 10u32;
+//     //     let mut context = get_context(deployer());
+//     //     testing_env!(context.clone());
 
-//         let initial_balance = context.account_balance;
-//         let initial_storage = context.storage_usage;
-//         context.attached_deposit = STORAGE_PRICE_PER_BYTE * 1000;
-//         testing_env!(context.clone());
-//         contract.approve(bob(), (mint_balance / 2).into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
-//         assert_eq!(
-//             context.account_balance,
-//             initial_balance
-//                 + Balance::from(context.storage_usage - initial_storage) * STORAGE_PRICE_PER_BYTE
-//         );
+//     //     let mut contract = Registry::new(governance());
+//     //     context.predecessor_account_id = governance();
+//     //     testing_env!(context.clone());
 
-//         let initial_balance = context.account_balance;
-//         let initial_storage = context.storage_usage;
-//         testing_env!(context.clone());
-//         context.attached_deposit = 0;
-//         testing_env!(context.clone());
-//         contract.approve(bob(), (mint_balance / 2).into());
-//         context.storage_usage = env::storage_usage();
-//         context.account_balance = env::account_balance();
-//         assert!(context.storage_usage == initial_storage);
-//         assert!(context.account_balance == initial_balance);
-//         assert_eq!(
-//             context.account_balance,
-//             initial_balance
-//                 - Balance::from(initial_storage - context.storage_usage) * STORAGE_PRICE_PER_BYTE
-//         );
-//     }
+//     //     contract.update_validator(alice(), _ratio + 11u32);
+
+//     //     // assert_eq!(contract.get_validator_ratio(alice()), Some(21u32));
+//     // }
+
+//     // #[test]
+//     // fn test_get_validator_ratio_with_non_exist() {
+//     //     let context = get_context(deployer());
+//     //     testing_env!(context.clone());
+
+//     //     let contract = Registry::new(governance());
+//     //     assert_eq!(contract.get_validator_ratio(alice()), None);
+//     // }
 // }
